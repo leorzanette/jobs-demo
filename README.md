@@ -1,53 +1,54 @@
-﻿# Job Application Tracker
+# Job Application Tracker
 
 Track job applications through a pipeline: Wishlist, Applied, Interview, Offer, Rejected, and Withdrawn.
 
-## Local development
+Data is stored in **Cloudflare D1** and syncs across all your devices. Access is protected by **Cloudflare Access** (Google / email PIN login).
+
+Live at: https://jobs.leorza.net
+
+## Local development (UI only)
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173
+API calls will fail locally unless you use the full stack command below.
 
-## Deploy to jobs.leorza.net (Cloudflare Pages)
+## Local development (UI + API + D1)
 
-### 1. Push to GitHub
+1. Replace `REPLACE_WITH_YOUR_D1_DATABASE_ID` in `wrangler.toml` with your D1 database ID (Cloudflare dashboard -> D1 -> job-tracker-db -> Database ID).
+2. Optionally set `DEV_BYPASS_EMAIL` in `wrangler.toml` for local auth bypass.
+3. Run:
 
-Create a **private** repo on GitHub, then:
+```bash
+npm run pages:dev
+```
+
+## Cloudflare Pages environment variables
+
+In your Pages project -> Settings -> Environment variables (Production):
+
+| Variable | Value |
+|----------|--------|
+| `NODE_VERSION` | `20` |
+| `ACCESS_TEAM_DOMAIN` | `leorzanet.cloudflareaccess.com` |
+| `ACCESS_AUD` | Your Access Application AUD tag (Zero Trust -> Access -> Applications -> Job Tracker -> Overview) |
+
+Also bind D1: Settings -> Bindings -> D1 -> variable name `DB` -> database `job-tracker-db`.
+
+## Deploy
+
+Push to GitHub — Cloudflare Pages auto-deploys:
 
 ```bash
 git add .
-git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "Initial job application tracker"
-git remote add origin https://github.com/YOUR_USERNAME/job-application-tracker.git
-git push -u origin main
+git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "Add D1 cloud sync"
+git push
 ```
 
-### 2. Connect Cloudflare Pages
+After deploy, the build log should show functions detected at `/functions`.
 
-1. Cloudflare Dashboard -> Workers & Pages -> Create -> Pages -> Connect to Git
-2. Select your repo
-3. Build settings:
-   - Framework preset: **Vite**
-   - Build command: `npm run build`
-   - Build output directory: `dist`
-   - Environment variable: `NODE_VERSION` = `20`
-4. Deploy and verify the `*.pages.dev` URL
+## Database
 
-### 3. Custom domain
-
-1. Pages project -> Custom domains -> Set up a custom domain
-2. Enter `jobs.leorza.net`
-3. Cloudflare creates the DNS record automatically (leorza.net is already on Cloudflare)
-
-### 4. Cloudflare Access (login gate)
-
-1. Cloudflare Zero Trust -> Access -> Applications -> Add application -> Self-hosted
-2. Application domain: `jobs.leorza.net`
-3. Add a policy: Allow your email address
-4. Set up an identity provider (email OTP, Google, or GitHub)
-
-## Data storage
-
-Applications are stored in your browser localStorage. Data is per browser/device and does not sync across devices.
+Schema is in `migrations/0001_init.sql`. If you already ran it in the D1 console, no further action needed.

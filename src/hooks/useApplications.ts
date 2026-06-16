@@ -1,40 +1,72 @@
-﻿import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ApplicationInput, JobApplication } from "../types/application";
-import { loadApplications, saveApplications } from "../utils/storage";
+import {
+  createApplicationApi,
+  deleteApplicationApi,
+  fetchApplications,
+  updateApplicationApi,
+} from "../utils/api";
 
 export function useApplications() {
-  const [applications, setApplications] = useState<JobApplication[]>(() =>
-    loadApplications(),
-  );
+  const [applications, setApplications] = useState<JobApplication[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    const apps = await fetchApplications();
+    setApplications(apps);
+  }, []);
 
   useEffect(() => {
-    saveApplications(applications);
-  }, [applications]);
+    let cancelled = false;
 
-  const add = useCallback((input: ApplicationInput) => {
-    const now = new Date().toISOString();
-    const app: JobApplication = {
-      ...input,
-      id: crypto.randomUUID(),
-      createdAt: now,
-      updatedAt: now,
+    fetchApplications()
+      .then((apps) => {
+        if (!cancelled) setApplications(apps);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load applications");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
     };
+  }, []);
+
+  const add = useCallback(async (input: ApplicationInput) => {
+    setError(null);
+    const app = await createApplicationApi(input);
     setApplications((prev) => [app, ...prev]);
   }, []);
 
-  const update = useCallback((id: string, input: ApplicationInput) => {
-    setApplications((prev) =>
-      prev.map((app) =>
-        app.id === id
-          ? { ...app, ...input, updatedAt: new Date().toISOString() }
-          : app,
-      ),
-    );
+  const update = useCallback(async (id: string, input: ApplicationInput) => {
+    setError(null);
+    const app = await updateApplicationApi(id, input);
+    setApplications((prev) => prev.map((item) => (item.id === id ? app : item)));
   }, []);
 
-  const remove = useCallback((id: string) => {
-    setApplications((prev) => prev.filter((app) => app.id !== id));
+  const remove = useCallback(async (id: string) => {
+    setError(null);
+    await deleteApplicationApi(id);
+    setApplications((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
-  return { applications, add, update, remove };
+  const retry = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await refresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load applications");
+    } finally {
+      setLoading(false);
+    }
+  }, [refresh]);
+
+  return { applications, loading, error, add, update, remove, retry };
 }
