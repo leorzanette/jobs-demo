@@ -1,5 +1,11 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
+function emailFromPayload(payload: Record<string, unknown>): string | null {
+  if (typeof payload.email === "string") return payload.email;
+  if (typeof payload.common_name === "string") return payload.common_name;
+  return null;
+}
+
 export async function getUserEmail(
   request: Request,
   env: Env,
@@ -12,17 +18,20 @@ export async function getUserEmail(
   const teamDomain =
     env.ACCESS_TEAM_DOMAIN ?? "leorzanet.cloudflareaccess.com";
   const issuer = `https://${teamDomain}`;
-  const JWKS = createRemoteJWKSet(new URL(`${issuer}/cdn-cgi/access/certs`));
 
   try {
-    const options: { issuer: string; audience?: string } = { issuer };
+    const JWKS = createRemoteJWKSet(new URL(`${issuer}/cdn-cgi/access/certs`));
+    const options: { issuer: string; audience?: string | string[] } = {
+      issuer,
+    };
     if (env.ACCESS_AUD) {
       options.audience = env.ACCESS_AUD;
     }
 
     const { payload } = await jwtVerify(token, JWKS, options);
-    return typeof payload.email === "string" ? payload.email : null;
-  } catch {
+    return emailFromPayload(payload as Record<string, unknown>);
+  } catch (err) {
+    console.error("JWT verification failed:", err);
     return null;
   }
 }
