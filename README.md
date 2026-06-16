@@ -17,9 +17,8 @@ API calls will fail locally unless you use the full stack command below.
 
 ## Local development (UI + API + D1)
 
-1. Replace `REPLACE_WITH_YOUR_D1_DATABASE_ID` in `wrangler.toml` with your D1 database ID (Cloudflare dashboard -> D1 -> job-tracker-db -> Database ID).
-2. Optionally set `DEV_BYPASS_EMAIL` in `wrangler.toml` for local auth bypass.
-3. Run:
+1. Bind D1 in the Cloudflare Pages dashboard (Settings -> Bindings -> DB -> job-tracker-db).
+2. For local dev, run:
 
 ```bash
 npm run pages:dev
@@ -39,7 +38,7 @@ Also bind D1: Settings -> Bindings -> D1 -> variable name `DB` -> database `job-
 
 ## Deploy
 
-Push to GitHub — Cloudflare Pages auto-deploys:
+Push to GitHub â€” Cloudflare Pages auto-deploys:
 
 ```bash
 git add .
