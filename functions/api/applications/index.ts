@@ -12,7 +12,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) =>
     const email = await getUserEmail(context.request, context.env);
     if (!email) return unauthorized();
 
-    const db = requireDb(context.env);
+    const db = await requireDb(context.env);
     if (db instanceof Response) return db;
 
     const rows = await listApplications(db, email);
@@ -24,7 +24,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) =>
     const email = await getUserEmail(context.request, context.env);
     if (!email) return unauthorized();
 
-    const db = requireDb(context.env);
+    const db = await requireDb(context.env);
     if (db instanceof Response) return db;
 
     let body: ApplicationPayload;

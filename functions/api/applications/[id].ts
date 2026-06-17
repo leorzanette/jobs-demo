@@ -12,7 +12,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) =>
     const email = await getUserEmail(context.request, context.env);
     if (!email) return unauthorized();
 
-    const db = requireDb(context.env);
+    const db = await requireDb(context.env);
     if (db instanceof Response) return db;
 
     const id = context.params.id as string;
@@ -57,7 +57,7 @@ export const onRequestDelete: PagesFunction<Env> = async (context) =>
     const email = await getUserEmail(context.request, context.env);
     if (!email) return unauthorized();
 
-    const db = requireDb(context.env);
+    const db = await requireDb(context.env);
     if (db instanceof Response) return db;
 
     const id = context.params.id as string;

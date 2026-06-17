@@ -1,10 +1,13 @@
-export function requireDb(env: Env): D1Database | Response {
+import { ensureSchema } from "./db";
+
+export async function requireDb(env: Env): Promise<D1Database | Response> {
   if (!env.DB) {
     return Response.json(
       { error: "Database binding missing. Add D1 binding named DB in Pages settings." },
       { status: 503 },
     );
   }
+  await ensureSchema(env.DB);
   return env.DB;
 }
 
