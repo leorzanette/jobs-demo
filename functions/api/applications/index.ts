@@ -6,6 +6,7 @@ import {
   type ApplicationPayload,
 } from "../../lib/db";
 import { requireDb, withHandler } from "../../lib/handler";
+import { normalizePayload } from "../../lib/payload";
 
 export const onRequestGet: PagesFunction<Env> = async (context) =>
   withHandler(async () => {
@@ -41,16 +42,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) =>
       );
     }
 
-    const row = await createApplication(db, email, {
-      company: body.company.trim(),
-      role: body.role.trim(),
-      status: body.status,
-      appliedDate: body.appliedDate,
-      followUpDate: body.followUpDate,
-      interviewDate: body.interviewDate,
-      jobUrl: body.jobUrl,
-      notes: body.notes,
-    });
+    const payload = normalizePayload(body);
+    if (payload instanceof Response) return payload;
+
+    const row = await createApplication(db, email, payload);
 
     return Response.json(rowToApplication(row), { status: 201 });
   });

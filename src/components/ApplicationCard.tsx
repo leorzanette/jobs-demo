@@ -1,5 +1,7 @@
 ﻿import type { JobApplication } from "../types/application";
 import { StatusBadge } from "./StatusBadge";
+import { PlatformBadge } from "./PlatformBadge";
+import { StageProgressBadge } from "./StageProgressBadge";
 import { formatDate, isUpcoming } from "../utils/stats";
 
 interface ApplicationCardProps {
@@ -24,6 +26,17 @@ export function ApplicationCard({ application, onClick }: ApplicationCardProps) 
         </div>
         <StatusBadge status={application.status} />
       </div>
+      {(application.platform || application.stageCurrent) && (
+        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+          {application.platform && (
+            <PlatformBadge platform={application.platform} />
+          )}
+          <StageProgressBadge
+            stageCurrent={application.stageCurrent}
+            stageTotal={application.stageTotal}
+          />
+        </div>
+      )}
       <div className="space-y-1 text-xs text-slate-500">
         {application.appliedDate && (
           <p>Applied: {formatDate(application.appliedDate)}</p>

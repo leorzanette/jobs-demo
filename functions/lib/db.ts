@@ -4,6 +4,9 @@ export interface ApplicationRow {
   company: string;
   role: string;
   status: string;
+  platform: string | null;
+  stage_current: number | null;
+  stage_total: number | null;
   applied_date: string | null;
   follow_up_date: string | null;
   interview_date: string | null;
@@ -15,10 +18,26 @@ export interface ApplicationRow {
 
 let schemaReady: Promise<void> | null = null;
 
+const COLUMN_MIGRATIONS = [
+  "ALTER TABLE applications ADD COLUMN platform TEXT",
+  "ALTER TABLE applications ADD COLUMN stage_current INTEGER",
+  "ALTER TABLE applications ADD COLUMN stage_total INTEGER",
+];
+
+async function runColumnMigrations(db: D1Database) {
+  for (const sql of COLUMN_MIGRATIONS) {
+    try {
+      await db.prepare(sql).run();
+    } catch {
+      // column already exists
+    }
+  }
+}
+
 export async function ensureSchema(db: D1Database): Promise<void> {
   if (!schemaReady) {
-    schemaReady = db
-      .batch([
+    schemaReady = (async () => {
+      await db.batch([
         db.prepare(`CREATE TABLE IF NOT EXISTS applications (
           id TEXT PRIMARY KEY,
           user_email TEXT NOT NULL,
@@ -36,8 +55,9 @@ export async function ensureSchema(db: D1Database): Promise<void> {
         db.prepare(
           "CREATE INDEX IF NOT EXISTS idx_applications_user ON applications(user_email)",
         ),
-      ])
-      .then(() => undefined);
+      ]);
+      await runColumnMigrations(db);
+    })();
   }
   await schemaReady;
 }
@@ -46,6 +66,9 @@ export interface ApplicationPayload {
   company: string;
   role: string;
   status: string;
+  platform?: string;
+  stageCurrent?: number;
+  stageTotal?: number;
   appliedDate?: string;
   followUpDate?: string;
   interviewDate?: string;
@@ -59,6 +82,9 @@ export function rowToApplication(row: ApplicationRow) {
     company: row.company,
     role: row.role,
     status: row.status,
+    platform: row.platform ?? undefined,
+    stageCurrent: row.stage_current ?? undefined,
+    stageTotal: row.stage_total ?? undefined,
     appliedDate: row.applied_date ?? undefined,
     followUpDate: row.follow_up_date ?? undefined,
     interviewDate: row.interview_date ?? undefined,
@@ -91,9 +117,10 @@ export async function createApplication(
     .prepare(
       `INSERT INTO applications (
         id, user_email, company, role, status,
+        platform, stage_current, stage_total,
         applied_date, follow_up_date, interview_date, job_url, notes,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -101,6 +128,9 @@ export async function createApplication(
       payload.company,
       payload.role,
       payload.status,
+      payload.platform ?? null,
+      payload.stageCurrent ?? null,
+      payload.stageTotal ?? null,
       payload.appliedDate ?? null,
       payload.followUpDate ?? null,
       payload.interviewDate ?? null,
@@ -132,6 +162,7 @@ export async function updateApplication(
     .prepare(
       `UPDATE applications SET
         company = ?, role = ?, status = ?,
+        platform = ?, stage_current = ?, stage_total = ?,
         applied_date = ?, follow_up_date = ?, interview_date = ?,
         job_url = ?, notes = ?, updated_at = ?
       WHERE id = ? AND user_email = ?`,
@@ -140,6 +171,9 @@ export async function updateApplication(
       payload.company,
       payload.role,
       payload.status,
+      payload.platform ?? null,
+      payload.stageCurrent ?? null,
+      payload.stageTotal ?? null,
       payload.appliedDate ?? null,
       payload.followUpDate ?? null,
       payload.interviewDate ?? null,

@@ -6,6 +6,7 @@ import {
   type ApplicationPayload,
 } from "../../lib/db";
 import { requireDb, withHandler } from "../../lib/handler";
+import { normalizePayload } from "../../lib/payload";
 
 export const onRequestPut: PagesFunction<Env> = async (context) =>
   withHandler(async () => {
@@ -34,16 +35,10 @@ export const onRequestPut: PagesFunction<Env> = async (context) =>
       );
     }
 
-    const row = await updateApplication(db, email, id, {
-      company: body.company.trim(),
-      role: body.role.trim(),
-      status: body.status,
-      appliedDate: body.appliedDate,
-      followUpDate: body.followUpDate,
-      interviewDate: body.interviewDate,
-      jobUrl: body.jobUrl,
-      notes: body.notes,
-    });
+    const payload = normalizePayload(body);
+    if (payload instanceof Response) return payload;
+
+    const row = await updateApplication(db, email, id, payload);
 
     if (!row) {
       return Response.json({ error: "Not found" }, { status: 404 });

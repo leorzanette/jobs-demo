@@ -1,6 +1,8 @@
 ﻿import { useState } from "react";
 import type { JobApplication } from "../types/application";
 import { StatusBadge } from "./StatusBadge";
+import { PlatformBadge } from "./PlatformBadge";
+import { StageProgressBadge } from "./StageProgressBadge";
 import { formatDate, isUpcoming } from "../utils/stats";
 
 interface ListViewProps {
@@ -37,7 +39,7 @@ export function ListView({ applications, onSelect }: ListViewProps) {
   if (applications.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-200 py-16 text-center text-slate-500">
-        No applications yet. Click Add Application to get started.
+        Nenhuma candidatura ainda. Clique em &quot;Add Application&quot; para começar.
       </div>
     );
   }
@@ -47,12 +49,12 @@ export function ListView({ applications, onSelect }: ListViewProps) {
       <table className="min-w-full text-sm">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50 text-left">
-            <th className={`px-4 py-3 font-medium ${headerClass("company")}`} onClick={() => toggleSort("company")}>Company</th>
-            <th className={`px-4 py-3 font-medium ${headerClass("role")}`} onClick={() => toggleSort("role")}>Role</th>
+            <th className={`px-4 py-3 font-medium ${headerClass("company")}`} onClick={() => toggleSort("company")}>Empresa</th>
+            <th className={`px-4 py-3 font-medium ${headerClass("role")}`} onClick={() => toggleSort("role")}>Cargo</th>
+            <th className="px-4 py-3 font-medium text-slate-500">Plataforma</th>
+            <th className="px-4 py-3 font-medium text-slate-500">Etapas</th>
             <th className={`px-4 py-3 font-medium ${headerClass("status")}`} onClick={() => toggleSort("status")}>Status</th>
-            <th className={`px-4 py-3 font-medium ${headerClass("appliedDate")}`} onClick={() => toggleSort("appliedDate")}>Applied</th>
-            <th className="px-4 py-3 font-medium text-slate-500">Follow-up</th>
-            <th className="px-4 py-3 font-medium text-slate-500">Interview</th>
+            <th className={`px-4 py-3 font-medium ${headerClass("appliedDate")}`} onClick={() => toggleSort("appliedDate")}>Candidatura</th>
           </tr>
         </thead>
         <tbody>
@@ -64,13 +66,19 @@ export function ListView({ applications, onSelect }: ListViewProps) {
             >
               <td className="px-4 py-3 font-medium text-slate-900">{app.company}</td>
               <td className="px-4 py-3 text-slate-600">{app.role}</td>
-              <td className="px-4 py-3"><StatusBadge status={app.status} /></td>
-              <td className="px-4 py-3 text-slate-600">{formatDate(app.appliedDate)}</td>
-              <td className={`px-4 py-3 ${isUpcoming(app.followUpDate) ? "font-medium text-amber-700" : "text-slate-600"}`}>
-                {formatDate(app.followUpDate)}
+              <td className="px-4 py-3">
+                {app.platform ? <PlatformBadge platform={app.platform} /> : "—"}
               </td>
-              <td className={`px-4 py-3 ${isUpcoming(app.interviewDate) ? "font-medium text-purple-700" : "text-slate-600"}`}>
-                {formatDate(app.interviewDate)}
+              <td className="px-4 py-3">
+                {app.stageCurrent ? (
+                  <StageProgressBadge stageCurrent={app.stageCurrent} stageTotal={app.stageTotal} />
+                ) : (
+                  "—"
+                )}
+              </td>
+              <td className="px-4 py-3"><StatusBadge status={app.status} /></td>
+              <td className={`px-4 py-3 ${isUpcoming(app.followUpDate) ? "font-medium text-amber-700" : "text-slate-600"}`}>
+                {formatDate(app.appliedDate)}
               </td>
             </tr>
           ))}
