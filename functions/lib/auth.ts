@@ -1,5 +1,16 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
+let cachedJwks: ReturnType<typeof createRemoteJWKSet> | null = null;
+let cachedIssuer: string | null = null;
+
+function getJwks(issuer: string) {
+  if (cachedIssuer !== issuer || !cachedJwks) {
+    cachedJwks = createRemoteJWKSet(new URL(`${issuer}/cdn-cgi/access/certs`));
+    cachedIssuer = issuer;
+  }
+  return cachedJwks;
+}
+
 function emailFromPayload(payload: Record<string, unknown>): string | null {
   if (typeof payload.email === "string") return payload.email;
   if (typeof payload.common_name === "string") return payload.common_name;
@@ -20,7 +31,6 @@ export async function getUserEmail(
   const issuer = `https://${teamDomain}`;
 
   try {
-    const JWKS = createRemoteJWKSet(new URL(`${issuer}/cdn-cgi/access/certs`));
     const options: { issuer: string; audience?: string | string[] } = {
       issuer,
     };
@@ -28,7 +38,7 @@ export async function getUserEmail(
       options.audience = env.ACCESS_AUD;
     }
 
-    const { payload } = await jwtVerify(token, JWKS, options);
+    const { payload } = await jwtVerify(token, getJwks(issuer), options);
     return emailFromPayload(payload as Record<string, unknown>);
   } catch (err) {
     console.error("JWT verification failed:", err);

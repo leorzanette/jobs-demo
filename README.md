@@ -6,48 +6,47 @@ Data is stored in **Cloudflare D1** and syncs across all your devices. Access is
 
 Live at: https://jobs.leorza.net
 
-## Local development (UI only)
+## Configure wrangler.toml (required)
+
+This Pages project manages **environment variables and D1 bindings through `wrangler.toml`**, not the dashboard (except encrypted Secrets).
+
+Edit `wrangler.toml` and add:
+
+### 1. ACCESS_AUD
+
+1. Zero Trust -> Access controls -> Applications -> Job Tracker -> **Overview**
+2. Copy the **Application Audience (AUD) Tag**
+3. Uncomment and set in `wrangler.toml`:
+
+```toml
+[vars]
+ACCESS_TEAM_DOMAIN = "leorzanet.cloudflareaccess.com"
+ACCESS_AUD = "paste-your-aud-tag-here"
+```
+
+### 2. D1 database binding
+
+1. Cloudflare dashboard -> **D1** -> `job-tracker-db` -> **Overview**
+2. Copy **Database ID**
+3. Uncomment and set in `wrangler.toml`:
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "job-tracker-db"
+database_id = "your-database-id-here"
+```
+
+4. Commit and push — Cloudflare redeploys automatically.
+
+## Local development
 
 ```bash
 npm install
-npm run dev
+npm run dev          # UI only (API will fail)
+npm run pages:dev    # UI + API + D1 (requires wrangler.toml configured)
 ```
 
-API calls will fail locally unless you use the full stack command below.
+## Database schema
 
-## Local development (UI + API + D1)
-
-1. Bind D1 in the Cloudflare Pages dashboard (Settings -> Bindings -> DB -> job-tracker-db).
-2. For local dev, run:
-
-```bash
-npm run pages:dev
-```
-
-## Cloudflare Pages environment variables
-
-In your Pages project -> Settings -> Environment variables (Production):
-
-| Variable | Value |
-|----------|--------|
-| `NODE_VERSION` | `20` |
-| `ACCESS_TEAM_DOMAIN` | `leorzanet.cloudflareaccess.com` |
-| `ACCESS_AUD` | Your Access Application AUD tag (Zero Trust -> Access -> Applications -> Job Tracker -> Overview) |
-
-Also bind D1: Settings -> Bindings -> D1 -> variable name `DB` -> database `job-tracker-db`.
-
-## Deploy
-
-Push to GitHub â€” Cloudflare Pages auto-deploys:
-
-```bash
-git add .
-git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "Add D1 cloud sync"
-git push
-```
-
-After deploy, the build log should show functions detected at `/functions`.
-
-## Database
-
-Schema is in `migrations/0001_init.sql`. If you already ran it in the D1 console, no further action needed.
+Already applied via D1 console? No action needed. Otherwise run `migrations/0001_init.sql` in the D1 SQL console.
