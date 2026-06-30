@@ -1,5 +1,6 @@
-﻿import { useState } from "react";
+﻿import { useMemo, useState } from "react";
 import type { JobApplication } from "../types/application";
+import { PLATFORM_LABELS } from "../types/application";
 import { StatusBadge } from "./StatusBadge";
 import { PlatformBadge } from "./PlatformBadge";
 import { StageProgressBadge } from "./StageProgressBadge";
@@ -10,18 +11,60 @@ interface ListViewProps {
   onSelect: (app: JobApplication) => void;
 }
 
-type SortKey = "company" | "role" | "status" | "appliedDate";
+type SortKey =
+  | "company"
+  | "role"
+  | "platform"
+  | "stages"
+  | "status"
+  | "appliedDate";
+
+function stageProgressValue(app: JobApplication): number | null {
+  if (!app.stageCurrent || !app.stageTotal) return null;
+  return app.stageCurrent / app.stageTotal;
+}
+
+function compareApplications(
+  a: JobApplication,
+  b: JobApplication,
+  key: SortKey,
+): number {
+  switch (key) {
+    case "platform": {
+      const av = a.platform ? PLATFORM_LABELS[a.platform] : "";
+      const bv = b.platform ? PLATFORM_LABELS[b.platform] : "";
+      if (!av && !bv) return 0;
+      if (!av) return 1;
+      if (!bv) return -1;
+      return av.localeCompare(bv);
+    }
+    case "stages": {
+      const av = stageProgressValue(a);
+      const bv = stageProgressValue(b);
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      if (av !== bv) return av - bv;
+      return (a.stageCurrent ?? 0) - (b.stageCurrent ?? 0);
+    }
+    default: {
+      const av = a[key] ?? "";
+      const bv = b[key] ?? "";
+      return String(av).localeCompare(String(bv));
+    }
+  }
+}
 
 export function ListView({ applications, onSelect }: ListViewProps) {
   const [sortKey, setSortKey] = useState<SortKey>("appliedDate");
   const [sortAsc, setSortAsc] = useState(false);
 
-  const sorted = [...applications].sort((a, b) => {
-    const av = a[sortKey] ?? "";
-    const bv = b[sortKey] ?? "";
-    const cmp = String(av).localeCompare(String(bv));
-    return sortAsc ? cmp : -cmp;
-  });
+  const sorted = useMemo(() => {
+    return [...applications].sort((a, b) => {
+      const cmp = compareApplications(a, b, sortKey);
+      return sortAsc ? cmp : -cmp;
+    });
+  }, [applications, sortKey, sortAsc]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -34,6 +77,12 @@ export function ListView({ applications, onSelect }: ListViewProps) {
 
   function headerClass(key: SortKey) {
     return `cursor-pointer select-none hover:text-slate-900 ${sortKey === key ? "text-slate-900" : "text-slate-500"}`;
+  }
+
+  function headerLabel(key: SortKey, label: string) {
+    const active = sortKey === key;
+    const arrow = active ? (sortAsc ? " ↑" : " ↓") : "";
+    return `${label}${arrow}`;
   }
 
   if (applications.length === 0) {
@@ -49,12 +98,24 @@ export function ListView({ applications, onSelect }: ListViewProps) {
       <table className="min-w-full text-sm">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50 text-left">
-            <th className={`px-4 py-3 font-medium ${headerClass("company")}`} onClick={() => toggleSort("company")}>Empresa</th>
-            <th className={`px-4 py-3 font-medium ${headerClass("role")}`} onClick={() => toggleSort("role")}>Cargo</th>
-            <th className="px-4 py-3 font-medium text-slate-500">Plataforma</th>
-            <th className="px-4 py-3 font-medium text-slate-500">Etapas</th>
-            <th className={`px-4 py-3 font-medium ${headerClass("status")}`} onClick={() => toggleSort("status")}>Status</th>
-            <th className={`px-4 py-3 font-medium ${headerClass("appliedDate")}`} onClick={() => toggleSort("appliedDate")}>Candidatura</th>
+            <th className={`px-4 py-3 font-medium ${headerClass("company")}`} onClick={() => toggleSort("company")}>
+              {headerLabel("company", "Empresa")}
+            </th>
+            <th className={`px-4 py-3 font-medium ${headerClass("role")}`} onClick={() => toggleSort("role")}>
+              {headerLabel("role", "Cargo")}
+            </th>
+            <th className={`px-4 py-3 font-medium ${headerClass("platform")}`} onClick={() => toggleSort("platform")}>
+              {headerLabel("platform", "Plataforma")}
+            </th>
+            <th className={`px-4 py-3 font-medium ${headerClass("stages")}`} onClick={() => toggleSort("stages")}>
+              {headerLabel("stages", "Etapas")}
+            </th>
+            <th className={`px-4 py-3 font-medium ${headerClass("status")}`} onClick={() => toggleSort("status")}>
+              {headerLabel("status", "Status")}
+            </th>
+            <th className={`px-4 py-3 font-medium ${headerClass("appliedDate")}`} onClick={() => toggleSort("appliedDate")}>
+              {headerLabel("appliedDate", "Candidatura")}
+            </th>
           </tr>
         </thead>
         <tbody>
