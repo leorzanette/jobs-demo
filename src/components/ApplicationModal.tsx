@@ -49,7 +49,7 @@ function buildInitial(application: JobApplication | null) {
   return {
     company: "",
     role: "",
-    status: "wishlist" as ApplicationStatus,
+    status: "applied" as ApplicationStatus,
     platform: "" as JobPlatform | "",
     stageCurrent: "",
     stageTotal: "",

@@ -89,7 +89,9 @@ export function BoardView({
   onSelect,
   onStatusChange,
 }: BoardViewProps) {
-  const columns = STATUSES.filter((s) => s !== "withdrawn");
+  const columns = STATUSES.filter(
+    (s) => s !== "withdrawn" && s !== "wishlist",
+  );
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overStatus, setOverStatus] = useState<ApplicationStatus | null>(null);
   const dragIdRef = useRef<string | null>(null);

@@ -25,7 +25,7 @@ export function SearchFilter({
       <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Job Application Tracker</h1>
-          <p className="text-sm text-slate-500">Track your pipeline from wishlist to offer</p>
+          <p className="text-sm text-slate-500">Track your pipeline from applied to offer</p>
         </div>
         <button
           type="button"
