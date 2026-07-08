@@ -1,13 +1,17 @@
 import { decryptSecret, encryptSecret } from "./crypto";
 import {
-  getMessage,
-  getMessageFrom,
-  getMessageSubject,
+  getMessagesBatch,
   listRecentMessages,
   refreshAccessToken,
   requireGoogleConfig,
+  getMessageFrom,
+  getMessageSubject,
 } from "./gmail";
-import { findMatchingApplication, matchKeyword } from "./gmailRules";
+import {
+  findMatchingApplication,
+  gmailKeywordQuery,
+  matchKeyword,
+} from "./gmailRules";
 import {
   insertSuggestion,
   listApplications,
@@ -15,6 +19,9 @@ import {
   updateGmailAccessToken,
   type GmailConnectionRow,
 } from "./db";
+
+/** Stay well under Workers Free external subrequest cap (50). */
+const MAX_MESSAGES = 40;
 
 async function resolveAccessToken(
   env: Env,
@@ -78,15 +85,21 @@ export async function syncUserInbox(
     status: app.status,
   }));
 
-  const messages = await listRecentMessages(accessToken, {
-    maxResults: 50,
+  // External subrequests: ~1 token refresh (optional) + 1 list + 1 batch
+  const listed = await listRecentMessages(accessToken, {
+    maxResults: MAX_MESSAGES,
     newerThanDays: 14,
+    query: gmailKeywordQuery(),
   });
+
+  const messages = await getMessagesBatch(
+    accessToken,
+    listed.map((item) => item.id),
+  );
 
   let created = 0;
 
-  for (const item of messages) {
-    const message = await getMessage(accessToken, item.id);
+  for (const message of messages) {
     const from = getMessageFrom(message);
     const subject = getMessageSubject(message);
     const snippet = message.snippet ?? "";

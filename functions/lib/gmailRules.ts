@@ -81,6 +81,17 @@ export function matchKeyword(text: string): KeywordMatch | null {
   return null;
 }
 
+/** Gmail `q` fragment that narrows list results before we fetch metadata. */
+export function gmailKeywordQuery(): string {
+  const terms = KEYWORD_RULES.flatMap((rule) =>
+    rule.keywords.map((keyword) => {
+      const escaped = keyword.replace(/"/g, "");
+      return escaped.includes(" ") ? `"${escaped}"` : escaped;
+    }),
+  );
+  return `(${terms.join(" OR ")})`;
+}
+
 export function findMatchingApplication(
   applications: MatchableApplication[],
   searchableText: string,
