@@ -135,10 +135,11 @@ function quoteGmailTerm(term: string): string {
   return escaped.includes(" ") ? `"${escaped}"` : escaped;
 }
 
-/** Gmail `q` fragment: keywords OR tracked company names. */
+/** Gmail `q` fragment: keywords OR tracked companies OR roles (cargos). */
 export function gmailKeywordQuery(
   rules: KeywordRule[] = DEFAULT_KEYWORD_RULES,
   companies: string[] = [],
+  roles: string[] = [],
 ): string {
   const keywordTerms = rules
     .flatMap((rule) => rule.keywords.map(quoteGmailTerm))
@@ -148,10 +149,15 @@ export function gmailKeywordQuery(
     .map((company) => quoteGmailTerm(company))
     .filter((term) => term.length >= 2);
 
+  const roleTerms = roles
+    .flatMap((role) => roleSearchTerms(role))
+    .map(quoteGmailTerm)
+    .filter((term) => term.length >= 3);
+
   // Deduplicate while preserving order
   const seen = new Set<string>();
   const terms: string[] = [];
-  for (const term of [...keywordTerms, ...companyTerms]) {
+  for (const term of [...keywordTerms, ...companyTerms, ...roleTerms]) {
     const key = term.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -162,6 +168,59 @@ export function gmailKeywordQuery(
   return `(${terms.join(" OR ")})`;
 }
 
+/** Skip generic job-title filler that would over-match unrelated mail. */
+const ROLE_STOPWORDS = new Set([
+  "de",
+  "da",
+  "do",
+  "das",
+  "dos",
+  "e",
+  "em",
+  "para",
+  "por",
+  "com",
+  "the",
+  "and",
+  "of",
+  "a",
+  "o",
+  "as",
+  "os",
+  "um",
+  "uma",
+  "jr",
+  "sr",
+  "pl",
+]);
+
+function significantTokens(text: string, minLen = 3): string[] {
+  return normalizeMatchText(text)
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= minLen && !ROLE_STOPWORDS.has(token));
+}
+
+/** Full role plus distinctive phrase chunks for the Gmail search query. */
+function roleSearchTerms(role: string): string[] {
+  const trimmed = role.trim();
+  if (!trimmed) return [];
+
+  const terms: string[] = [trimmed];
+  const tokens = significantTokens(trimmed, 4);
+
+  // Prefer multi-word phrases so "Analista de Sistemas" beats lone "Analista"
+  if (tokens.length >= 2) {
+    terms.push(tokens.slice(0, 2).join(" "));
+    if (tokens.length >= 3) {
+      terms.push(tokens.slice(0, 3).join(" "));
+    }
+  } else if (tokens.length === 1 && tokens[0]!.length >= 6) {
+    terms.push(tokens[0]!);
+  }
+
+  return terms;
+}
+
 function companyAppearsInText(haystack: string, company: string): boolean {
   const normalizedCompany = normalizeMatchText(company.trim());
   if (normalizedCompany.length < 2) return false;
@@ -170,9 +229,7 @@ function companyAppearsInText(haystack: string, company: string): boolean {
   if (haystack.includes(normalizedCompany)) return true;
 
   // Significant tokens (e.g. "Afya Educação" → "afya")
-  const tokens = normalizedCompany
-    .split(/[^a-z0-9]+/)
-    .filter((token) => token.length >= 3);
+  const tokens = significantTokens(company, 3);
 
   if (tokens.length === 0) return false;
 
@@ -190,23 +247,60 @@ function companyAppearsInText(haystack: string, company: string): boolean {
   return hits.length >= 2;
 }
 
+function roleAppearsInText(haystack: string, role: string): boolean {
+  const normalizedRole = normalizeMatchText(role.trim());
+  if (normalizedRole.length < 4) return false;
+
+  // Full role title substring
+  if (haystack.includes(normalizedRole)) return true;
+
+  const tokens = significantTokens(role, 4);
+  if (tokens.length === 0) return false;
+
+  // Require a distinctive multi-token hit to avoid "Junior" alone
+  if (tokens.length === 1) {
+    return tokens[0]!.length >= 8 && haystack.includes(tokens[0]!);
+  }
+
+  if (tokens.length >= 2) {
+    const phrase2 = tokens.slice(0, 2).join(" ");
+    if (haystack.includes(phrase2)) return true;
+  }
+  if (tokens.length >= 3) {
+    const phrase3 = tokens.slice(0, 3).join(" ");
+    if (haystack.includes(phrase3)) return true;
+  }
+
+  const hits = tokens.filter((token) => haystack.includes(token));
+  return hits.length >= 2;
+}
+
 export function findMatchingApplication(
   applications: MatchableApplication[],
   searchableText: string,
 ): MatchableApplication | null {
   const haystack = normalizeMatchText(searchableText);
-  const matches = applications.filter((app) =>
-    companyAppearsInText(haystack, app.company),
-  );
 
-  if (matches.length === 0) return null;
+  const scored = applications
+    .map((app) => {
+      let score = 0;
+      if (companyAppearsInText(haystack, app.company)) score += 10;
+      if (roleAppearsInText(haystack, app.role)) score += 5;
+      return { app, score };
+    })
+    .filter((item) => item.score > 0);
 
-  const active = matches.filter((app) => ACTIVE_STATUSES.has(app.status));
-  const pool = active.length > 0 ? active : matches;
+  if (scored.length === 0) return null;
 
-  // Prefer longer company names (more specific matches)
-  pool.sort((a, b) => b.company.length - a.company.length);
-  return pool[0] ?? null;
+  const active = scored.filter((item) => ACTIVE_STATUSES.has(item.app.status));
+  const pool = active.length > 0 ? active : scored;
+
+  pool.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return b.app.company.length - a.app.company.length;
+  });
+
+  return pool[0]?.app ?? null;
 }
 
 export function normalizeGmailRules(input: unknown): GmailRulesConfig | string {

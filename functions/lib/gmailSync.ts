@@ -94,7 +94,8 @@ export async function syncUserInbox(
 
   const rules = await loadGmailRules(env.DB, connection.user_email);
   const companies = applications.map((app) => app.company);
-  const keywordQuery = gmailKeywordQuery(rules.keywords, companies);
+  const roles = applications.map((app) => app.role);
+  const keywordQuery = gmailKeywordQuery(rules.keywords, companies, roles);
 
   // External subrequests: ~1 token refresh (optional) + 1 list + 1 batch + attachment hydrates
   const listed = await listRecentMessages(accessToken, {
@@ -117,7 +118,7 @@ export async function syncUserInbox(
     const subject = getMessageSubject(message);
     const snippet = message.snippet ?? "";
     const body = getMessageBody(message);
-    // Match keywords + company against the whole email (headers/snippet/body)
+    // Match keywords + company/role against the whole email (headers/snippet/body)
     const searchable = getMessageSearchText(message);
 
     if (isBlacklisted(searchable, rules.blacklist)) continue;
@@ -128,8 +129,7 @@ export async function syncUserInbox(
     const application = findMatchingApplication(matchable, searchable);
     if (!application) continue;
 
-    if (application.status === keywordMatch.status) continue;
-
+    // Still surface the email even if the card is already that status (user can dismiss).
     const preview = (snippet || body).slice(0, 280);
 
     const row = await insertSuggestion(env.DB, connection.user_email, {
