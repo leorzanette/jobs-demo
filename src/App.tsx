@@ -9,6 +9,7 @@ import { BoardView } from "./components/BoardView";
 import { ListView } from "./components/ListView";
 import { ApplicationModal } from "./components/ApplicationModal";
 import { SuggestionQueue } from "./components/SuggestionQueue";
+import { GmailRulesSettings } from "./components/GmailRulesSettings";
 
 function filterApplications(
   applications: JobApplication[],
@@ -47,6 +48,7 @@ export default function App() {
   const [selected, setSelected] = useState<JobApplication | null>(null);
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [rulesOpen, setRulesOpen] = useState(false);
 
   const filtered = useMemo(
     () => filterApplications(applications, search, statusFilter),
@@ -174,9 +176,10 @@ export default function App() {
             gmail.setError(null);
             gmail.setQueueOpen(true);
           }}
+          onOpenSettings={() => setRulesOpen(true)}
         />
         <StatsBar stats={stats} />
-        {bannerError && !modalOpen && !gmail.queueOpen && (
+        {bannerError && !modalOpen && !gmail.queueOpen && !rulesOpen && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
             {bannerError}
           </div>
@@ -211,6 +214,10 @@ export default function App() {
         onClose={() => gmail.setQueueOpen(false)}
         onAccept={(id) => void gmail.accept(id)}
         onDismiss={(id) => void gmail.dismiss(id)}
+      />
+      <GmailRulesSettings
+        open={rulesOpen}
+        onClose={() => setRulesOpen(false)}
       />
     </div>
   );

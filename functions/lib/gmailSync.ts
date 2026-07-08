@@ -11,8 +11,10 @@ import {
 import {
   findMatchingApplication,
   gmailKeywordQuery,
+  isBlacklisted,
   matchKeyword,
 } from "./gmailRules";
+import { loadGmailRules } from "./gmailRulesStore";
 import {
   insertSuggestion,
   listApplications,
@@ -86,11 +88,14 @@ export async function syncUserInbox(
     status: app.status,
   }));
 
+  const rules = await loadGmailRules(env.DB, connection.user_email);
+  const keywordQuery = gmailKeywordQuery(rules.keywords);
+
   // External subrequests: ~1 token refresh (optional) + 1 list + 1 batch
   const listed = await listRecentMessages(accessToken, {
     maxResults: MAX_MESSAGES,
     newerThanDays: 14,
-    query: gmailKeywordQuery(),
+    query: keywordQuery || undefined,
   });
 
   const messages = await getMessagesBatch(
@@ -107,7 +112,12 @@ export async function syncUserInbox(
     const body = getMessageBody(message);
     const searchable = `${from} ${subject} ${snippet} ${body}`;
 
-    const keywordMatch = matchKeyword(`${subject} ${snippet} ${body}`);
+    if (isBlacklisted(searchable, rules.blacklist)) continue;
+
+    const keywordMatch = matchKeyword(
+      `${subject} ${snippet} ${body}`,
+      rules.keywords,
+    );
     if (!keywordMatch) continue;
 
     const application = findMatchingApplication(matchable, searchable);

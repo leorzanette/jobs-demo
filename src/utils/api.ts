@@ -2,6 +2,7 @@ import type { ApplicationInput, JobApplication } from "../types/application";
 import type {
   AcceptSuggestionResult,
   EmailSuggestion,
+  GmailRulesConfig,
   GmailStatus,
 } from "../types/gmail";
 
@@ -136,4 +137,25 @@ export async function dismissSuggestionApi(
 
 export function gmailConnectUrl(): string {
   return `${GMAIL_BASE}/oauth/start`;
+}
+
+export async function fetchGmailRules(): Promise<GmailRulesConfig> {
+  const response = await apiFetch(`${GMAIL_BASE}/rules`);
+  return handleResponse<GmailRulesConfig>(response);
+}
+
+export async function saveGmailRulesApi(
+  rules: GmailRulesConfig,
+): Promise<GmailRulesConfig> {
+  const response = await apiFetch(`${GMAIL_BASE}/rules`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(rules),
+  });
+  return handleResponse<GmailRulesConfig>(response);
+}
+
+export async function resetGmailRulesApi(): Promise<GmailRulesConfig> {
+  const response = await apiFetch(`${GMAIL_BASE}/rules`, { method: "POST" });
+  return handleResponse<GmailRulesConfig>(response);
 }

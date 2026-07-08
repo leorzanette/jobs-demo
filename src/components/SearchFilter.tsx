@@ -16,6 +16,7 @@ interface SearchFilterProps {
   onGmailSync: () => void;
   onGmailDisconnect: () => void;
   onOpenSuggestions: () => void;
+  onOpenSettings: () => void;
 }
 
 export function SearchFilter({
@@ -31,6 +32,7 @@ export function SearchFilter({
   onGmailSync,
   onGmailDisconnect,
   onOpenSuggestions,
+  onOpenSettings,
 }: SearchFilterProps) {
   const connected = gmailStatus?.connected ?? false;
   const pendingCount = gmailStatus?.pendingCount ?? 0;
@@ -59,6 +61,13 @@ export function SearchFilter({
                 className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 {gmailSyncing ? "Syncing…" : "Sync Gmail"}
+              </button>
+              <button
+                type="button"
+                onClick={onOpenSettings}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Settings
               </button>
               <button
                 type="button"

@@ -85,6 +85,13 @@ export async function ensureSchema(db: D1Database): Promise<void> {
         db.prepare(
           "CREATE INDEX IF NOT EXISTS idx_email_suggestions_application ON email_suggestions(application_id)",
         ),
+        db.prepare(`CREATE TABLE IF NOT EXISTS gmail_rules (
+          user_email TEXT PRIMARY KEY,
+          keywords_json TEXT NOT NULL,
+          blacklist_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )`),
       ]);
       await runColumnMigrations(db);
     })();
@@ -518,4 +525,51 @@ export async function deleteApplication(
     .bind(id, email)
     .run();
   return result.meta.changes > 0;
+}
+
+export interface GmailRulesRow {
+  user_email: string;
+  keywords_json: string;
+  blacklist_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getGmailRulesRow(db: D1Database, email: string) {
+  return db
+    .prepare("SELECT * FROM gmail_rules WHERE user_email = ?")
+    .bind(email)
+    .first<GmailRulesRow>();
+}
+
+export async function upsertGmailRules(
+  db: D1Database,
+  email: string,
+  keywordsJson: string,
+  blacklistJson: string,
+) {
+  const now = new Date().toISOString();
+  const existing = await getGmailRulesRow(db, email);
+
+  if (existing) {
+    await db
+      .prepare(
+        `UPDATE gmail_rules SET
+          keywords_json = ?, blacklist_json = ?, updated_at = ?
+        WHERE user_email = ?`,
+      )
+      .bind(keywordsJson, blacklistJson, now, email)
+      .run();
+  } else {
+    await db
+      .prepare(
+        `INSERT INTO gmail_rules (
+          user_email, keywords_json, blacklist_json, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?)`,
+      )
+      .bind(email, keywordsJson, blacklistJson, now, now)
+      .run();
+  }
+
+  return getGmailRulesRow(db, email);
 }
