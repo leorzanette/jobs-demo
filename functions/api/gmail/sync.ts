@@ -23,12 +23,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) =>
 
     if (isCron) {
       const connections = await listGmailConnections(db);
-      const results: {
-        email: string;
-        scanned: number;
-        created: number;
-        error?: string;
-      }[] = [];
+      const results: Array<Record<string, unknown>> = [];
 
       for (const connection of connections) {
         try {

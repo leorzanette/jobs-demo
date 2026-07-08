@@ -316,14 +316,33 @@ export function getMessageBody(message: GmailMessage, maxChars = 50_000): string
   return text;
 }
 
-/** Full email text for keyword + company matching: headers, snippet, and body. */
+/** Full email text: From/Subject headers, snippet, and body. */
 export function getMessageSearchText(message: GmailMessage): string {
-  const headers = (message.payload?.headers ?? [])
-    .map((h) => `${h.name} ${h.value}`)
-    .join("\n");
+  const from = getMessageFrom(message);
+  const subject = getMessageSubject(message);
   const snippet = message.snippet ?? "";
   const body = getMessageBody(message);
-  return `${headers}\n${snippet}\n${body}`;
+  return `${from}\n${subject}\n${snippet}\n${body}`;
+}
+
+/** Subject + body (+ snippet) — primary fields for company/role/keyword matching. */
+export function getMessageSubjectAndBody(message: GmailMessage): string {
+  const subject = getMessageSubject(message);
+  const snippet = message.snippet ?? "";
+  const body = getMessageBody(message);
+  return `${subject}\n${snippet}\n${body}`;
+}
+
+/** Split OR terms into Gmail-safe query chunks (Gmail q length / result noise). */
+export function chunkOrQuery(terms: string[], chunkSize = 8): string[] {
+  const cleaned = terms.map((t) => t.trim()).filter(Boolean);
+  if (cleaned.length === 0) return [];
+  const chunks: string[] = [];
+  for (let i = 0; i < cleaned.length; i += chunkSize) {
+    const slice = cleaned.slice(i, i + chunkSize);
+    chunks.push(`(${slice.join(" OR ")})`);
+  }
+  return chunks;
 }
 
 export async function listRecentMessages(

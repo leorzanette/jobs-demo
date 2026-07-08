@@ -122,10 +122,23 @@ export function useGmail(onApplicationUpdated?: (app: JobApplication) => void) {
     setSyncing(true);
     setError(null);
     try {
-      await syncGmailApi();
+      const result = await syncGmailApi();
       await refresh();
       setView("pending");
       setQueueOpen(true);
+      if (result.created === 0 && (result.scanned ?? 0) > 0) {
+        const bits = [
+          `Scanned ${result.scanned} emails (last ${result.lookbackDays ?? 7}d)`,
+          result.noKeyword ? `${result.noKeyword} no keyword` : null,
+          result.noApplication ? `${result.noApplication} no company/role` : null,
+          result.blacklisted ? `${result.blacklisted} blacklisted` : null,
+          result.skippedAccepted
+            ? `${result.skippedAccepted} already accepted`
+            : null,
+        ].filter(Boolean);
+        setError(`No new suggestions. ${bits.join(" · ")}`);
+      }
+      return result;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Sync failed");
       throw err;

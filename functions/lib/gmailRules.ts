@@ -129,7 +129,7 @@ export function matchKeyword(
   return null;
 }
 
-function quoteGmailTerm(term: string): string {
+export function quoteGmailTerm(term: string): string {
   const escaped = term.trim().replace(/"/g, "");
   if (!escaped) return "";
   return escaped.includes(" ") ? `"${escaped}"` : escaped;

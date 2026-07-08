@@ -312,6 +312,112 @@ export async function getApplicationById(
     .first<ApplicationRow>();
 }
 
+export async function getSuggestionByGmailMessageId(
+  db: D1Database,
+  email: string,
+  gmailMessageId: string,
+) {
+  return db
+    .prepare(
+      `SELECT * FROM email_suggestions
+       WHERE user_email = ? AND gmail_message_id = ?`,
+    )
+    .bind(email, gmailMessageId)
+    .first<EmailSuggestionRow>();
+}
+
+/**
+ * Insert a pending suggestion, or refresh an existing non-accepted one
+ * (reopens dismissed items so a later sync can surface them again).
+ */
+export async function upsertPendingSuggestion(
+  db: D1Database,
+  email: string,
+  data: {
+    applicationId: string;
+    gmailMessageId: string;
+    suggestedStatus: string;
+    matchedKeyword: string;
+    emailFrom?: string;
+    emailSubject?: string;
+    emailSnippet?: string;
+  },
+): Promise<{
+  row: EmailSuggestionRow;
+  outcome: "created" | "updated" | "revived";
+} | null> {
+  const existing = await getSuggestionByGmailMessageId(
+    db,
+    email,
+    data.gmailMessageId,
+  );
+  const now = new Date().toISOString();
+
+  if (existing) {
+    // Do not revive accepted suggestions
+    if (existing.status === "accepted") return null;
+
+    const outcome = existing.status === "dismissed" ? "revived" : "updated";
+
+    await db
+      .prepare(
+        `UPDATE email_suggestions SET
+          application_id = ?,
+          suggested_status = ?,
+          matched_keyword = ?,
+          email_from = ?,
+          email_subject = ?,
+          email_snippet = ?,
+          status = 'pending',
+          updated_at = ?
+        WHERE id = ? AND user_email = ?`,
+      )
+      .bind(
+        data.applicationId,
+        data.suggestedStatus,
+        data.matchedKeyword,
+        data.emailFrom ?? null,
+        data.emailSubject ?? null,
+        data.emailSnippet ?? null,
+        now,
+        existing.id,
+        email,
+      )
+      .run();
+
+    const row = await getSuggestion(db, email, existing.id);
+    return row ? { row, outcome } : null;
+  }
+
+  const id = crypto.randomUUID();
+  await db
+    .prepare(
+      `INSERT INTO email_suggestions (
+        id, user_email, application_id, gmail_message_id,
+        suggested_status, matched_keyword, email_from, email_subject,
+        email_snippet, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+    )
+    .bind(
+      id,
+      email,
+      data.applicationId,
+      data.gmailMessageId,
+      data.suggestedStatus,
+      data.matchedKeyword,
+      data.emailFrom ?? null,
+      data.emailSubject ?? null,
+      data.emailSnippet ?? null,
+      now,
+      now,
+    )
+    .run();
+
+  const row = await getSuggestion(db, email, id);
+  return row ? { row, outcome: "created" } : null;
+}
+
+/** @deprecated Prefer upsertPendingSuggestion */
 export async function insertSuggestion(
   db: D1Database,
   email: string,
@@ -325,38 +431,8 @@ export async function insertSuggestion(
     emailSnippet?: string;
   },
 ): Promise<EmailSuggestionRow | null> {
-  const id = crypto.randomUUID();
-  const now = new Date().toISOString();
-
-  try {
-    await db
-      .prepare(
-        `INSERT INTO email_suggestions (
-          id, user_email, application_id, gmail_message_id,
-          suggested_status, matched_keyword, email_from, email_subject,
-          email_snippet, status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
-      )
-      .bind(
-        id,
-        email,
-        data.applicationId,
-        data.gmailMessageId,
-        data.suggestedStatus,
-        data.matchedKeyword,
-        data.emailFrom ?? null,
-        data.emailSubject ?? null,
-        data.emailSnippet ?? null,
-        now,
-        now,
-      )
-      .run();
-  } catch {
-    // UNIQUE (user_email, gmail_message_id) — already processed
-    return null;
-  }
-
-  return getSuggestion(db, email, id);
+  const result = await upsertPendingSuggestion(db, email, data);
+  return result?.row ?? null;
 }
 
 export async function updateSuggestionStatus(

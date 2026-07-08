@@ -105,10 +105,19 @@ export async function disconnectGmailApi(): Promise<void> {
   }
 }
 
-export async function syncGmailApi(): Promise<{
+export interface GmailSyncResult {
   scanned: number;
   created: number;
-}> {
+  lookbackDays?: number;
+  candidates?: number;
+  blacklisted?: number;
+  noKeyword?: number;
+  noApplication?: number;
+  skippedAccepted?: number;
+  revived?: number;
+}
+
+export async function syncGmailApi(): Promise<GmailSyncResult> {
   const response = await apiFetch(`${GMAIL_BASE}/sync`, { method: "POST" });
   return handleResponse(response);
 }
