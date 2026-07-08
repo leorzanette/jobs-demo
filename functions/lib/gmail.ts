@@ -123,12 +123,23 @@ export interface GmailMessageListItem {
   threadId: string;
 }
 
+interface GmailBody {
+  data?: string;
+  size?: number;
+}
+
+interface GmailPayloadPart {
+  mimeType?: string;
+  filename?: string;
+  headers?: { name: string; value: string }[];
+  body?: GmailBody;
+  parts?: GmailPayloadPart[];
+}
+
 export interface GmailMessage {
   id: string;
   snippet: string;
-  payload?: {
-    headers?: { name: string; value: string }[];
-  };
+  payload?: GmailPayloadPart;
   internalDate?: string;
 }
 
@@ -151,11 +162,75 @@ export function getMessageSubject(message: GmailMessage): string {
   return headerValue(message, "Subject") ?? "";
 }
 
+function decodeBase64Url(data: string): string {
+  const padded = data.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = padded.length % 4 === 0 ? "" : "=".repeat(4 - (padded.length % 4));
+  const binary = atob(padded + pad);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function collectParts(
+  part: GmailPayloadPart | undefined,
+  plain: string[],
+  html: string[],
+): void {
+  if (!part) return;
+
+  const mime = (part.mimeType ?? "").toLowerCase();
+  const data = part.body?.data;
+
+  if (data && (!part.filename || part.filename.length === 0)) {
+    if (mime === "text/plain") {
+      plain.push(decodeBase64Url(data));
+    } else if (mime === "text/html") {
+      html.push(decodeBase64Url(data));
+    } else if (!mime && !part.parts) {
+      // Single-part messages sometimes omit mimeType on the root
+      plain.push(decodeBase64Url(data));
+    }
+  }
+
+  for (const child of part.parts ?? []) {
+    collectParts(child, plain, html);
+  }
+}
+
+/** Prefer text/plain; fall back to stripped HTML. Caps length for matching. */
+export function getMessageBody(message: GmailMessage, maxChars = 20_000): string {
+  const plain: string[] = [];
+  const html: string[] = [];
+  collectParts(message.payload, plain, html);
+
+  let text = plain.join("\n").trim();
+  if (!text && html.length > 0) {
+    text = stripHtml(html.join("\n"));
+  }
+  if (text.length > maxChars) return text.slice(0, maxChars);
+  return text;
+}
+
 export async function listRecentMessages(
   accessToken: string,
   opts?: { maxResults?: number; newerThanDays?: number; query?: string },
 ): Promise<GmailMessageListItem[]> {
-  const maxResults = opts?.maxResults ?? 40;
+  const maxResults = opts?.maxResults ?? 25;
   const days = opts?.newerThanDays ?? 14;
   const extra = opts?.query?.trim();
   const q = extra
@@ -183,7 +258,7 @@ export async function getMessage(
   accessToken: string,
   messageId: string,
 ): Promise<GmailMessage> {
-  const url = `${GMAIL_API}/messages/${encodeURIComponent(messageId)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`;
+  const url = `${GMAIL_API}/messages/${encodeURIComponent(messageId)}?format=full`;
 
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -198,7 +273,7 @@ export async function getMessage(
 }
 
 /**
- * Fetch message metadata in one HTTP call via Gmail's batch API.
+ * Fetch full messages (headers + body parts) in one HTTP call via Gmail batch.
  * Essential on Workers Free (50 external subrequests/invocation).
  */
 export async function getMessagesBatch(
@@ -209,7 +284,7 @@ export async function getMessagesBatch(
 
   const boundary = `batch_${crypto.randomUUID().replace(/-/g, "")}`;
   const parts = messageIds.map((id, index) => {
-    const path = `/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`;
+    const path = `/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`;
     return [
       `--${boundary}`,
       "Content-Type: application/http",

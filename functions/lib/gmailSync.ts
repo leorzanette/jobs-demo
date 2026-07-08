@@ -4,6 +4,7 @@ import {
   listRecentMessages,
   refreshAccessToken,
   requireGoogleConfig,
+  getMessageBody,
   getMessageFrom,
   getMessageSubject,
 } from "./gmail";
@@ -21,7 +22,7 @@ import {
 } from "./db";
 
 /** Stay well under Workers Free external subrequest cap (50). */
-const MAX_MESSAGES = 40;
+const MAX_MESSAGES = 25;
 
 async function resolveAccessToken(
   env: Env,
@@ -103,15 +104,18 @@ export async function syncUserInbox(
     const from = getMessageFrom(message);
     const subject = getMessageSubject(message);
     const snippet = message.snippet ?? "";
-    const searchable = `${from} ${subject} ${snippet}`;
+    const body = getMessageBody(message);
+    const searchable = `${from} ${subject} ${snippet} ${body}`;
 
-    const keywordMatch = matchKeyword(`${subject} ${snippet}`);
+    const keywordMatch = matchKeyword(`${subject} ${snippet} ${body}`);
     if (!keywordMatch) continue;
 
     const application = findMatchingApplication(matchable, searchable);
     if (!application) continue;
 
     if (application.status === keywordMatch.status) continue;
+
+    const preview = (snippet || body).slice(0, 280);
 
     const row = await insertSuggestion(env.DB, connection.user_email, {
       applicationId: application.id,
@@ -120,7 +124,7 @@ export async function syncUserInbox(
       matchedKeyword: keywordMatch.keyword,
       emailFrom: from,
       emailSubject: subject,
-      emailSnippet: snippet.slice(0, 280),
+      emailSnippet: preview,
     });
 
     if (row) created += 1;
