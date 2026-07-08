@@ -4,6 +4,7 @@ import type {
   EmailSuggestion,
   GmailRulesConfig,
   GmailStatus,
+  SuggestedStatus,
 } from "../types/gmail";
 
 const API_BASE = "/api/applications";
@@ -131,6 +132,30 @@ export async function dismissSuggestionApi(
 ): Promise<{ suggestion: EmailSuggestion }> {
   const response = await apiFetch(`${GMAIL_BASE}/suggestions/${id}/dismiss`, {
     method: "POST",
+  });
+  return handleResponse(response);
+}
+
+export async function fetchSuggestionHistory(): Promise<EmailSuggestion[]> {
+  const response = await apiFetch(`${GMAIL_BASE}/suggestions/history`);
+  return handleResponse<EmailSuggestion[]>(response);
+}
+
+export async function updateSuggestionApi(
+  id: string,
+  payload: {
+    suggestedStatus?: SuggestedStatus;
+    status?: "pending" | "accepted" | "dismissed";
+    applyToApplication?: boolean;
+  },
+): Promise<{
+  suggestion: EmailSuggestion;
+  application: JobApplication | null;
+}> {
+  const response = await apiFetch(`${GMAIL_BASE}/suggestions/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
   return handleResponse(response);
 }

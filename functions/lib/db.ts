@@ -271,6 +271,23 @@ export async function listPendingSuggestions(db: D1Database, email: string) {
   return results ?? [];
 }
 
+export async function listSuggestionHistory(
+  db: D1Database,
+  email: string,
+  limit = 100,
+) {
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM email_suggestions
+       WHERE user_email = ? AND status IN ('accepted', 'dismissed')
+       ORDER BY updated_at DESC
+       LIMIT ?`,
+    )
+    .bind(email, limit)
+    .all<EmailSuggestionRow>();
+  return results ?? [];
+}
+
 export async function getSuggestion(
   db: D1Database,
   email: string,
@@ -346,15 +363,44 @@ export async function updateSuggestionStatus(
   db: D1Database,
   email: string,
   id: string,
-  status: "accepted" | "dismissed",
+  status: "pending" | "accepted" | "dismissed",
 ) {
   const now = new Date().toISOString();
   const result = await db
     .prepare(
       `UPDATE email_suggestions SET status = ?, updated_at = ?
-       WHERE id = ? AND user_email = ? AND status = 'pending'`,
+       WHERE id = ? AND user_email = ?`,
     )
     .bind(status, now, id, email)
+    .run();
+
+  if (!result.meta.changes) return null;
+  return getSuggestion(db, email, id);
+}
+
+export async function updateSuggestionFields(
+  db: D1Database,
+  email: string,
+  id: string,
+  fields: {
+    suggestedStatus?: string;
+    status?: "pending" | "accepted" | "dismissed";
+  },
+) {
+  const existing = await getSuggestion(db, email, id);
+  if (!existing) return null;
+
+  const now = new Date().toISOString();
+  const suggestedStatus = fields.suggestedStatus ?? existing.suggested_status;
+  const status = fields.status ?? existing.status;
+
+  const result = await db
+    .prepare(
+      `UPDATE email_suggestions SET
+        suggested_status = ?, status = ?, updated_at = ?
+       WHERE id = ? AND user_email = ?`,
+    )
+    .bind(suggestedStatus, status, now, id, email)
     .run();
 
   if (!result.meta.changes) return null;

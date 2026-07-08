@@ -173,8 +173,7 @@ export default function App() {
           onGmailSync={() => void handleGmailSync()}
           onGmailDisconnect={() => void handleGmailDisconnect()}
           onOpenSuggestions={() => {
-            gmail.setError(null);
-            gmail.setQueueOpen(true);
+            gmail.openQueue("pending");
           }}
           onOpenSettings={() => setRulesOpen(true)}
         />
@@ -208,12 +207,18 @@ export default function App() {
       )}
       <SuggestionQueue
         open={gmail.queueOpen}
+        view={gmail.view}
         suggestions={gmail.suggestions}
+        history={gmail.history}
+        historyLoading={gmail.historyLoading}
         actingId={gmail.actingId}
         error={gmail.error}
         onClose={() => gmail.setQueueOpen(false)}
+        onShowHistory={() => gmail.showHistory()}
+        onShowPending={() => gmail.showPending()}
         onAccept={(id) => void gmail.accept(id)}
         onDismiss={(id) => void gmail.dismiss(id)}
+        onUpdateHistory={(id, payload) => void gmail.updateHistoryItem(id, payload)}
       />
       <GmailRulesSettings
         open={rulesOpen}
