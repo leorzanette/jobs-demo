@@ -100,6 +100,12 @@ export function useApplications() {
     setApplications((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
+  const patchLocal = useCallback((app: JobApplication) => {
+    setApplications((prev) =>
+      prev.map((item) => (item.id === app.id ? app : item)),
+    );
+  }, []);
+
   const retry = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -120,6 +126,7 @@ export function useApplications() {
     update,
     updateStatus,
     remove,
+    patchLocal,
     retry,
   };
 }

@@ -1,6 +1,12 @@
 import type { ApplicationInput, JobApplication } from "../types/application";
+import type {
+  AcceptSuggestionResult,
+  EmailSuggestion,
+  GmailStatus,
+} from "../types/gmail";
 
 const API_BASE = "/api/applications";
+const GMAIL_BASE = "/api/gmail";
 
 async function apiFetch(
   url: string,
@@ -81,4 +87,53 @@ export async function deleteApplicationApi(id: string): Promise<void> {
   if (!response.ok && response.status !== 204) {
     await handleResponse(response);
   }
+}
+
+export async function fetchGmailStatus(): Promise<GmailStatus> {
+  const response = await apiFetch(`${GMAIL_BASE}/status`);
+  return handleResponse<GmailStatus>(response);
+}
+
+export async function disconnectGmailApi(): Promise<void> {
+  const response = await apiFetch(`${GMAIL_BASE}/connection`, {
+    method: "DELETE",
+  });
+  if (!response.ok && response.status !== 204) {
+    await handleResponse(response);
+  }
+}
+
+export async function syncGmailApi(): Promise<{
+  scanned: number;
+  created: number;
+}> {
+  const response = await apiFetch(`${GMAIL_BASE}/sync`, { method: "POST" });
+  return handleResponse(response);
+}
+
+export async function fetchSuggestions(): Promise<EmailSuggestion[]> {
+  const response = await apiFetch(`${GMAIL_BASE}/suggestions`);
+  return handleResponse<EmailSuggestion[]>(response);
+}
+
+export async function acceptSuggestionApi(
+  id: string,
+): Promise<AcceptSuggestionResult> {
+  const response = await apiFetch(`${GMAIL_BASE}/suggestions/${id}/accept`, {
+    method: "POST",
+  });
+  return handleResponse<AcceptSuggestionResult>(response);
+}
+
+export async function dismissSuggestionApi(
+  id: string,
+): Promise<{ suggestion: EmailSuggestion }> {
+  const response = await apiFetch(`${GMAIL_BASE}/suggestions/${id}/dismiss`, {
+    method: "POST",
+  });
+  return handleResponse(response);
+}
+
+export function gmailConnectUrl(): string {
+  return `${GMAIL_BASE}/oauth/start`;
 }

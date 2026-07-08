@@ -55,11 +55,326 @@ export async function ensureSchema(db: D1Database): Promise<void> {
         db.prepare(
           "CREATE INDEX IF NOT EXISTS idx_applications_user ON applications(user_email)",
         ),
+        db.prepare(`CREATE TABLE IF NOT EXISTS gmail_connections (
+          user_email TEXT PRIMARY KEY,
+          refresh_token_enc TEXT NOT NULL,
+          access_token_enc TEXT,
+          access_token_expires_at TEXT,
+          last_synced_at TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )`),
+        db.prepare(`CREATE TABLE IF NOT EXISTS email_suggestions (
+          id TEXT PRIMARY KEY,
+          user_email TEXT NOT NULL,
+          application_id TEXT NOT NULL,
+          gmail_message_id TEXT NOT NULL,
+          suggested_status TEXT NOT NULL,
+          matched_keyword TEXT NOT NULL,
+          email_from TEXT,
+          email_subject TEXT,
+          email_snippet TEXT,
+          status TEXT NOT NULL DEFAULT 'pending',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE (user_email, gmail_message_id)
+        )`),
+        db.prepare(
+          "CREATE INDEX IF NOT EXISTS idx_email_suggestions_user_status ON email_suggestions(user_email, status)",
+        ),
+        db.prepare(
+          "CREATE INDEX IF NOT EXISTS idx_email_suggestions_application ON email_suggestions(application_id)",
+        ),
       ]);
       await runColumnMigrations(db);
     })();
   }
   await schemaReady;
+}
+
+export interface GmailConnectionRow {
+  user_email: string;
+  refresh_token_enc: string;
+  access_token_enc: string | null;
+  access_token_expires_at: string | null;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmailSuggestionRow {
+  id: string;
+  user_email: string;
+  application_id: string;
+  gmail_message_id: string;
+  suggested_status: string;
+  matched_keyword: string;
+  email_from: string | null;
+  email_subject: string | null;
+  email_snippet: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export function rowToSuggestion(
+  row: EmailSuggestionRow,
+  application?: { company: string; role: string; status: string } | null,
+) {
+  return {
+    id: row.id,
+    applicationId: row.application_id,
+    gmailMessageId: row.gmail_message_id,
+    suggestedStatus: row.suggested_status,
+    matchedKeyword: row.matched_keyword,
+    emailFrom: row.email_from ?? undefined,
+    emailSubject: row.email_subject ?? undefined,
+    emailSnippet: row.email_snippet ?? undefined,
+    status: row.status,
+    company: application?.company,
+    role: application?.role,
+    currentStatus: application?.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function getGmailConnection(db: D1Database, email: string) {
+  return db
+    .prepare("SELECT * FROM gmail_connections WHERE user_email = ?")
+    .bind(email)
+    .first<GmailConnectionRow>();
+}
+
+export async function listGmailConnections(db: D1Database) {
+  const { results } = await db
+    .prepare("SELECT * FROM gmail_connections")
+    .all<GmailConnectionRow>();
+  return results ?? [];
+}
+
+export async function upsertGmailConnection(
+  db: D1Database,
+  email: string,
+  data: {
+    refreshTokenEnc: string;
+    accessTokenEnc?: string | null;
+    accessTokenExpiresAt?: string | null;
+  },
+) {
+  const now = new Date().toISOString();
+  const existing = await getGmailConnection(db, email);
+
+  if (existing) {
+    await db
+      .prepare(
+        `UPDATE gmail_connections SET
+          refresh_token_enc = ?,
+          access_token_enc = ?,
+          access_token_expires_at = ?,
+          updated_at = ?
+        WHERE user_email = ?`,
+      )
+      .bind(
+        data.refreshTokenEnc,
+        data.accessTokenEnc ?? null,
+        data.accessTokenExpiresAt ?? null,
+        now,
+        email,
+      )
+      .run();
+  } else {
+    await db
+      .prepare(
+        `INSERT INTO gmail_connections (
+          user_email, refresh_token_enc, access_token_enc,
+          access_token_expires_at, last_synced_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, NULL, ?, ?)`,
+      )
+      .bind(
+        email,
+        data.refreshTokenEnc,
+        data.accessTokenEnc ?? null,
+        data.accessTokenExpiresAt ?? null,
+        now,
+        now,
+      )
+      .run();
+  }
+
+  return getGmailConnection(db, email);
+}
+
+export async function updateGmailAccessToken(
+  db: D1Database,
+  email: string,
+  accessTokenEnc: string,
+  accessTokenExpiresAt: string,
+) {
+  const now = new Date().toISOString();
+  await db
+    .prepare(
+      `UPDATE gmail_connections SET
+        access_token_enc = ?, access_token_expires_at = ?, updated_at = ?
+      WHERE user_email = ?`,
+    )
+    .bind(accessTokenEnc, accessTokenExpiresAt, now, email)
+    .run();
+}
+
+export async function markGmailSynced(db: D1Database, email: string) {
+  const now = new Date().toISOString();
+  await db
+    .prepare(
+      `UPDATE gmail_connections SET last_synced_at = ?, updated_at = ?
+      WHERE user_email = ?`,
+    )
+    .bind(now, now, email)
+    .run();
+}
+
+export async function deleteGmailConnection(db: D1Database, email: string) {
+  const result = await db
+    .prepare("DELETE FROM gmail_connections WHERE user_email = ?")
+    .bind(email)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function countPendingSuggestions(db: D1Database, email: string) {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) as count FROM email_suggestions
+       WHERE user_email = ? AND status = 'pending'`,
+    )
+    .bind(email)
+    .first<{ count: number }>();
+  return row?.count ?? 0;
+}
+
+export async function listPendingSuggestions(db: D1Database, email: string) {
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM email_suggestions
+       WHERE user_email = ? AND status = 'pending'
+       ORDER BY created_at DESC`,
+    )
+    .bind(email)
+    .all<EmailSuggestionRow>();
+  return results ?? [];
+}
+
+export async function getSuggestion(
+  db: D1Database,
+  email: string,
+  id: string,
+) {
+  return db
+    .prepare(
+      "SELECT * FROM email_suggestions WHERE id = ? AND user_email = ?",
+    )
+    .bind(id, email)
+    .first<EmailSuggestionRow>();
+}
+
+export async function getApplicationById(
+  db: D1Database,
+  email: string,
+  id: string,
+) {
+  return db
+    .prepare("SELECT * FROM applications WHERE id = ? AND user_email = ?")
+    .bind(id, email)
+    .first<ApplicationRow>();
+}
+
+export async function insertSuggestion(
+  db: D1Database,
+  email: string,
+  data: {
+    applicationId: string;
+    gmailMessageId: string;
+    suggestedStatus: string;
+    matchedKeyword: string;
+    emailFrom?: string;
+    emailSubject?: string;
+    emailSnippet?: string;
+  },
+): Promise<EmailSuggestionRow | null> {
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  try {
+    await db
+      .prepare(
+        `INSERT INTO email_suggestions (
+          id, user_email, application_id, gmail_message_id,
+          suggested_status, matched_keyword, email_from, email_subject,
+          email_snippet, status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      )
+      .bind(
+        id,
+        email,
+        data.applicationId,
+        data.gmailMessageId,
+        data.suggestedStatus,
+        data.matchedKeyword,
+        data.emailFrom ?? null,
+        data.emailSubject ?? null,
+        data.emailSnippet ?? null,
+        now,
+        now,
+      )
+      .run();
+  } catch {
+    // UNIQUE (user_email, gmail_message_id) — already processed
+    return null;
+  }
+
+  return getSuggestion(db, email, id);
+}
+
+export async function updateSuggestionStatus(
+  db: D1Database,
+  email: string,
+  id: string,
+  status: "accepted" | "dismissed",
+) {
+  const now = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `UPDATE email_suggestions SET status = ?, updated_at = ?
+       WHERE id = ? AND user_email = ? AND status = 'pending'`,
+    )
+    .bind(status, now, id, email)
+    .run();
+
+  if (!result.meta.changes) return null;
+  return getSuggestion(db, email, id);
+}
+
+export async function updateApplicationStatus(
+  db: D1Database,
+  email: string,
+  id: string,
+  status: string,
+) {
+  const now = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `UPDATE applications SET status = ?, updated_at = ?
+       WHERE id = ? AND user_email = ?`,
+    )
+    .bind(status, now, id, email)
+    .run();
+
+  if (!result.meta.changes) return null;
+
+  return db
+    .prepare("SELECT * FROM applications WHERE id = ? AND user_email = ?")
+    .bind(id, email)
+    .first<ApplicationRow>();
 }
 
 export interface ApplicationPayload {

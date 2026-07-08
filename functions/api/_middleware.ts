@@ -6,7 +6,8 @@ export const onRequest: PagesFunction = async (context) => {
         "Access-Control-Allow-Origin":
           context.request.headers.get("Origin") ?? "*",
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Headers":
+          "Content-Type, X-Cron-Secret, Authorization",
         "Access-Control-Max-Age": "86400",
       },
     });

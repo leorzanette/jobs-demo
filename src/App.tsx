@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
 import type { ApplicationStatus, JobApplication } from "./types/application";
 import { useApplications } from "./hooks/useApplications";
+import { useGmail } from "./hooks/useGmail";
 import { computeStats } from "./utils/stats";
 import { SearchFilter } from "./components/SearchFilter";
 import { StatsBar } from "./components/StatsBar";
 import { BoardView } from "./components/BoardView";
 import { ListView } from "./components/ListView";
 import { ApplicationModal } from "./components/ApplicationModal";
+import { SuggestionQueue } from "./components/SuggestionQueue";
 
 function filterApplications(
   applications: JobApplication[],
@@ -26,8 +28,18 @@ function filterApplications(
 }
 
 export default function App() {
-  const { applications, loading, error, add, update, updateStatus, remove, retry } =
-    useApplications();
+  const {
+    applications,
+    loading,
+    error,
+    add,
+    update,
+    updateStatus,
+    remove,
+    patchLocal,
+    retry,
+  } = useApplications();
+  const gmail = useGmail(patchLocal);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | "all">("all");
   const [view, setView] = useState<"board" | "list">("board");
@@ -98,6 +110,26 @@ export default function App() {
     }
   }
 
+  async function handleGmailSync() {
+    setActionError(null);
+    try {
+      await gmail.sync();
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Gmail sync failed");
+    }
+  }
+
+  async function handleGmailDisconnect() {
+    setActionError(null);
+    try {
+      await gmail.disconnect();
+    } catch (err: unknown) {
+      setActionError(
+        err instanceof Error ? err.message : "Failed to disconnect Gmail",
+      );
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
@@ -121,6 +153,8 @@ export default function App() {
     );
   }
 
+  const bannerError = actionError ?? gmail.error;
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -132,11 +166,19 @@ export default function App() {
           view={view}
           onViewChange={setView}
           onAdd={openAdd}
+          gmailStatus={gmail.status}
+          gmailSyncing={gmail.syncing}
+          onGmailSync={() => void handleGmailSync()}
+          onGmailDisconnect={() => void handleGmailDisconnect()}
+          onOpenSuggestions={() => {
+            gmail.setError(null);
+            gmail.setQueueOpen(true);
+          }}
         />
         <StatsBar stats={stats} />
-        {actionError && !modalOpen && (
+        {bannerError && !modalOpen && !gmail.queueOpen && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
-            {actionError}
+            {bannerError}
           </div>
         )}
         {view === "board" ? (
@@ -161,6 +203,15 @@ export default function App() {
           onDelete={selected ? handleDelete : undefined}
         />
       )}
+      <SuggestionQueue
+        open={gmail.queueOpen}
+        suggestions={gmail.suggestions}
+        actingId={gmail.actingId}
+        error={gmail.error}
+        onClose={() => gmail.setQueueOpen(false)}
+        onAccept={(id) => void gmail.accept(id)}
+        onDismiss={(id) => void gmail.dismiss(id)}
+      />
     </div>
   );
 }

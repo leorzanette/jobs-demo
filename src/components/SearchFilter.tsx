@@ -1,5 +1,7 @@
 ﻿import type { ApplicationStatus } from "../types/application";
 import { STATUSES, STATUS_LABELS } from "../types/application";
+import type { GmailStatus } from "../types/gmail";
+import { gmailConnectUrl } from "../utils/api";
 
 interface SearchFilterProps {
   search: string;
@@ -9,6 +11,11 @@ interface SearchFilterProps {
   view: "board" | "list";
   onViewChange: (view: "board" | "list") => void;
   onAdd: () => void;
+  gmailStatus: GmailStatus | null;
+  gmailSyncing: boolean;
+  onGmailSync: () => void;
+  onGmailDisconnect: () => void;
+  onOpenSuggestions: () => void;
 }
 
 export function SearchFilter({
@@ -19,7 +26,15 @@ export function SearchFilter({
   view,
   onViewChange,
   onAdd,
+  gmailStatus,
+  gmailSyncing,
+  onGmailSync,
+  onGmailDisconnect,
+  onOpenSuggestions,
 }: SearchFilterProps) {
+  const connected = gmailStatus?.connected ?? false;
+  const pendingCount = gmailStatus?.pendingCount ?? 0;
+
   return (
     <header className="mb-6">
       <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -27,13 +42,54 @@ export function SearchFilter({
           <h1 className="text-2xl font-bold text-slate-900">Job Application Tracker</h1>
           <p className="text-sm text-slate-500">Track your pipeline from applied to offer</p>
         </div>
-        <button
-          type="button"
-          onClick={onAdd}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          Add Application
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {!connected ? (
+            <a
+              href={gmailConnectUrl()}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Connect Gmail
+            </a>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={onGmailSync}
+                disabled={gmailSyncing}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {gmailSyncing ? "Syncing…" : "Sync Gmail"}
+              </button>
+              <button
+                type="button"
+                onClick={onOpenSuggestions}
+                className="relative rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Suggestions
+                {pendingCount > 0 && (
+                  <span className="ml-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={onGmailDisconnect}
+                className="rounded-lg px-2 py-2 text-sm text-slate-500 hover:text-slate-800"
+                title="Disconnect Gmail"
+              >
+                Disconnect
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={onAdd}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Add Application
+          </button>
+        </div>
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <input

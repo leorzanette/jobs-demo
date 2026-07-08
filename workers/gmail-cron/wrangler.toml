@@ -1,0 +1,10 @@
+name = "job-tracker-gmail-cron"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+
+# Production sync endpoint (Pages Function)
+[vars]
+SYNC_URL = "https://jobs.leorza.net/api/gmail/sync"
+
+[triggers]
+crons = ["*/10 * * * *"]
