@@ -10,6 +10,8 @@ import { ListView } from "./components/ListView";
 import { ApplicationModal } from "./components/ApplicationModal";
 import { SuggestionQueue } from "./components/SuggestionQueue";
 import { GmailRulesSettings } from "./components/GmailRulesSettings";
+import { DemoBanner } from "./components/DemoBanner";
+import { isDemoMode } from "./demo/isDemoMode";
 
 function filterApplications(
   applications: JobApplication[],
@@ -112,6 +114,17 @@ export default function App() {
     }
   }
 
+  async function handleGmailConnect() {
+    setActionError(null);
+    try {
+      await gmail.connect();
+    } catch (err: unknown) {
+      setActionError(
+        err instanceof Error ? err.message : "Gmail connection failed",
+      );
+    }
+  }
+
   async function handleGmailSync() {
     setActionError(null);
     try {
@@ -159,6 +172,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {isDemoMode && <DemoBanner />}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <SearchFilter
           search={search}
@@ -170,6 +184,7 @@ export default function App() {
           onAdd={openAdd}
           gmailStatus={gmail.status}
           gmailSyncing={gmail.syncing}
+          onGmailConnect={() => void handleGmailConnect()}
           onGmailSync={() => void handleGmailSync()}
           onGmailDisconnect={() => void handleGmailDisconnect()}
           onOpenSuggestions={() => {

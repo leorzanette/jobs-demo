@@ -1,5 +1,6 @@
 ﻿import type { ApplicationStatus } from "../types/application";
 import { STATUSES, STATUS_LABELS } from "../types/application";
+import { isDemoMode } from "../demo/isDemoMode";
 import type { GmailStatus } from "../types/gmail";
 import { gmailConnectUrl } from "../utils/api";
 
@@ -13,6 +14,7 @@ interface SearchFilterProps {
   onAdd: () => void;
   gmailStatus: GmailStatus | null;
   gmailSyncing: boolean;
+  onGmailConnect?: () => void;
   onGmailSync: () => void;
   onGmailDisconnect: () => void;
   onOpenSuggestions: () => void;
@@ -29,6 +31,7 @@ export function SearchFilter({
   onAdd,
   gmailStatus,
   gmailSyncing,
+  onGmailConnect,
   onGmailSync,
   onGmailDisconnect,
   onOpenSuggestions,
@@ -46,12 +49,22 @@ export function SearchFilter({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {!connected ? (
-            <a
-              href={gmailConnectUrl()}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Connect Gmail
-            </a>
+            isDemoMode ? (
+              <button
+                type="button"
+                onClick={onGmailConnect}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Connect Gmail
+              </button>
+            ) : (
+              <a
+                href={gmailConnectUrl()}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Connect Gmail
+              </a>
+            )
           ) : (
             <>
               <button

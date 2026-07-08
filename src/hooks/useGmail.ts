@@ -4,6 +4,7 @@ import type { JobApplication } from "../types/application";
 import {
   acceptSuggestionApi,
   clearSuggestionsApi,
+  connectGmailDemo,
   disconnectGmailApi,
   dismissSuggestionApi,
   fetchGmailStatus,
@@ -133,8 +134,11 @@ export function useGmail(onApplicationUpdated?: (app: JobApplication) => void) {
           result.noKeyword ? `${result.noKeyword} no keyword` : null,
           result.noApplication ? `${result.noApplication} no company/role` : null,
           result.blacklisted ? `${result.blacklisted} blacklisted` : null,
-          result.skippedAccepted
-            ? `${result.skippedAccepted} already accepted`
+          result.skippedExisting
+            ? `${result.skippedExisting} already reviewed`
+            : null,
+          result.skippedAlreadySorted
+            ? `${result.skippedAlreadySorted} already sorted`
             : null,
         ].filter(Boolean);
         setError(`No new suggestions. ${bits.join(" · ")}`);
@@ -155,6 +159,19 @@ export function useGmail(onApplicationUpdated?: (app: JobApplication) => void) {
     setHistory([]);
     setStatus({ connected: false, lastSyncedAt: null, pendingCount: 0 });
   }, []);
+
+  const connect = useCallback(async () => {
+    setError(null);
+    try {
+      await connectGmailDemo();
+      await refresh();
+      setView("pending");
+      setQueueOpen(true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to connect Gmail");
+      throw err;
+    }
+  }, [refresh]);
 
   const clearAll = useCallback(async () => {
     setError(null);
@@ -267,6 +284,7 @@ export function useGmail(onApplicationUpdated?: (app: JobApplication) => void) {
     error,
     setError,
     sync,
+    connect,
     disconnect,
     clearAll,
     accept,
