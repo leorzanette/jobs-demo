@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import type { ApplicationInput, JobApplication } from "../types/application";
+import type {
+  ApplicationInput,
+  ApplicationStatus,
+  JobApplication,
+} from "../types/application";
 import {
   createApplicationApi,
   deleteApplicationApi,
@@ -50,6 +54,46 @@ export function useApplications() {
     setApplications((prev) => prev.map((item) => (item.id === id ? app : item)));
   }, []);
 
+  const updateStatus = useCallback(
+    async (id: string, status: ApplicationStatus) => {
+      setError(null);
+
+      let previous: JobApplication | undefined;
+      setApplications((prev) => {
+        const current = prev.find((item) => item.id === id);
+        if (!current || current.status === status) return prev;
+        previous = current;
+        return prev.map((item) =>
+          item.id === id
+            ? { ...item, status, updatedAt: new Date().toISOString() }
+            : item,
+        );
+      });
+
+      if (!previous) return;
+
+      try {
+        const {
+          id: _id,
+          createdAt: _createdAt,
+          updatedAt: _updatedAt,
+          ...input
+        } = previous;
+        const app = await updateApplicationApi(id, { ...input, status });
+        setApplications((prev) =>
+          prev.map((item) => (item.id === id ? app : item)),
+        );
+      } catch (err) {
+        const rollback = previous;
+        setApplications((prev) =>
+          prev.map((item) => (item.id === id ? rollback : item)),
+        );
+        throw err;
+      }
+    },
+    [],
+  );
+
   const remove = useCallback(async (id: string) => {
     setError(null);
     await deleteApplicationApi(id);
@@ -68,5 +112,14 @@ export function useApplications() {
     }
   }, [refresh]);
 
-  return { applications, loading, error, add, update, remove, retry };
+  return {
+    applications,
+    loading,
+    error,
+    add,
+    update,
+    updateStatus,
+    remove,
+    retry,
+  };
 }

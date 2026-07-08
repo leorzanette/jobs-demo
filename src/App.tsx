@@ -26,7 +26,7 @@ function filterApplications(
 }
 
 export default function App() {
-  const { applications, loading, error, add, update, remove, retry } =
+  const { applications, loading, error, add, update, updateStatus, remove, retry } =
     useApplications();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | "all">("all");
@@ -87,6 +87,17 @@ export default function App() {
     }
   }
 
+  async function handleStatusChange(id: string, status: ApplicationStatus) {
+    setActionError(null);
+    try {
+      await updateStatus(id, status);
+    } catch (err: unknown) {
+      setActionError(
+        err instanceof Error ? err.message : "Failed to update status",
+      );
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
@@ -123,8 +134,17 @@ export default function App() {
           onAdd={openAdd}
         />
         <StatsBar stats={stats} />
+        {actionError && !modalOpen && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+            {actionError}
+          </div>
+        )}
         {view === "board" ? (
-          <BoardView applications={filtered} onSelect={openEdit} />
+          <BoardView
+            applications={filtered}
+            onSelect={openEdit}
+            onStatusChange={handleStatusChange}
+          />
         ) : (
           <ListView applications={filtered} onSelect={openEdit} />
         )}
