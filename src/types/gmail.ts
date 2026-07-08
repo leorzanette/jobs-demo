@@ -47,7 +47,7 @@ export interface GmailRulesConfig {
 export const SUGGESTED_STATUS_LABELS: Record<SuggestedStatus, string> = {
   offer: "Offer",
   rejected: "Rejected",
-  interview: "Interview",
+  interview: "To do",
   applied: "Applied",
 };
 

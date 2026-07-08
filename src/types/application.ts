@@ -44,7 +44,7 @@ export const PLATFORMS: JobPlatform[] = [
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
   wishlist: "Wishlist",
   applied: "Applied",
-  interview: "Interview",
+  interview: "To do",
   offer: "Offer",
   rejected: "Rejected",
   withdrawn: "Withdrawn",

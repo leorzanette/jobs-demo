@@ -7,12 +7,12 @@ interface StatsBarProps {
 export function StatsBar({ stats }: StatsBarProps) {
   const cards = [
     { label: "Total", value: stats.total.toString() },
-    { label: "Active", value: stats.active.toString(), hint: "Applied + Interview" },
-    { label: "Interviews", value: stats.interviews.toString() },
+    { label: "Active", value: stats.active.toString(), hint: "Applied + To do" },
+    { label: "To do", value: stats.interviews.toString() },
     {
       label: "Response rate",
       value: stats.responseRate !== null ? `${stats.responseRate}%` : "—",
-      hint: "Interview or Offer / Applied+",
+      hint: "To do or Offer / Applied+",
     },
   ];
 
