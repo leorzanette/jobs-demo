@@ -221,29 +221,44 @@ function roleSearchTerms(role: string): string[] {
   return terms;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Exact whole-word / whole-phrase match (avoids "positivo" matching "positivos"). */
+function hasExactWordOrPhrase(haystack: string, phrase: string): boolean {
+  const needle = phrase.trim();
+  if (needle.length < 2) return false;
+  const pattern = new RegExp(
+    `(^|[^a-z0-9])${escapeRegExp(needle)}([^a-z0-9]|$)`,
+    "i",
+  );
+  return pattern.test(haystack);
+}
+
 function companyAppearsInText(haystack: string, company: string): boolean {
   const normalizedCompany = normalizeMatchText(company.trim());
   if (normalizedCompany.length < 2) return false;
 
-  // Exact / substring company name
-  if (haystack.includes(normalizedCompany)) return true;
+  // Exact company name as a whole word/phrase
+  if (hasExactWordOrPhrase(haystack, normalizedCompany)) return true;
 
-  // Significant tokens (e.g. "Afya Educação" → "afya")
+  // Multi-word company: brand token must appear as its own word (e.g. "Afya")
   const tokens = significantTokens(company, 3);
-
   if (tokens.length === 0) return false;
 
-  // Single meaningful token: accept it
   if (tokens.length === 1) {
-    return haystack.includes(tokens[0]!);
+    return hasExactWordOrPhrase(haystack, tokens[0]!);
   }
 
-  // Multi-word: prefer the longest token (usually the brand)
+  // Prefer the longest brand-like token as a whole word
   const longest = [...tokens].sort((a, b) => b.length - a.length)[0]!;
-  if (longest.length >= 4 && haystack.includes(longest)) return true;
+  if (longest.length >= 3 && hasExactWordOrPhrase(haystack, longest)) {
+    return true;
+  }
 
-  // Or require at least two tokens to appear
-  const hits = tokens.filter((token) => haystack.includes(token));
+  // Or at least two significant tokens as whole words
+  const hits = tokens.filter((token) => hasExactWordOrPhrase(haystack, token));
   return hits.length >= 2;
 }
 
@@ -251,27 +266,29 @@ function roleAppearsInText(haystack: string, role: string): boolean {
   const normalizedRole = normalizeMatchText(role.trim());
   if (normalizedRole.length < 4) return false;
 
-  // Full role title substring
-  if (haystack.includes(normalizedRole)) return true;
+  // Full role title as an exact phrase
+  if (hasExactWordOrPhrase(haystack, normalizedRole)) return true;
 
   const tokens = significantTokens(role, 4);
   if (tokens.length === 0) return false;
 
   // Require a distinctive multi-token hit to avoid "Junior" alone
   if (tokens.length === 1) {
-    return tokens[0]!.length >= 8 && haystack.includes(tokens[0]!);
+    return (
+      tokens[0]!.length >= 8 && hasExactWordOrPhrase(haystack, tokens[0]!)
+    );
   }
 
   if (tokens.length >= 2) {
     const phrase2 = tokens.slice(0, 2).join(" ");
-    if (haystack.includes(phrase2)) return true;
+    if (hasExactWordOrPhrase(haystack, phrase2)) return true;
   }
   if (tokens.length >= 3) {
     const phrase3 = tokens.slice(0, 3).join(" ");
-    if (haystack.includes(phrase3)) return true;
+    if (hasExactWordOrPhrase(haystack, phrase3)) return true;
   }
 
-  const hits = tokens.filter((token) => haystack.includes(token));
+  const hits = tokens.filter((token) => hasExactWordOrPhrase(haystack, token));
   return hits.length >= 2;
 }
 
@@ -288,7 +305,8 @@ export function findMatchingApplication(
       if (roleAppearsInText(haystack, app.role)) score += 5;
       return { app, score };
     })
-    .filter((item) => item.score > 0);
+    // Require a company word match — role alone is too noisy
+    .filter((item) => item.score >= 10);
 
   if (scored.length === 0) return null;
 
