@@ -127,6 +127,13 @@ export async function fetchSuggestions(): Promise<EmailSuggestion[]> {
   return handleResponse<EmailSuggestion[]>(response);
 }
 
+export async function clearSuggestionsApi(): Promise<{ deleted: number }> {
+  const response = await apiFetch(`${GMAIL_BASE}/suggestions`, {
+    method: "DELETE",
+  });
+  return handleResponse(response);
+}
+
 export async function acceptSuggestionApi(
   id: string,
 ): Promise<AcceptSuggestionResult> {

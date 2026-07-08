@@ -3,6 +3,7 @@ import type { EmailSuggestion, GmailStatus, SuggestedStatus } from "../types/gma
 import type { JobApplication } from "../types/application";
 import {
   acceptSuggestionApi,
+  clearSuggestionsApi,
   disconnectGmailApi,
   dismissSuggestionApi,
   fetchGmailStatus,
@@ -155,6 +156,16 @@ export function useGmail(onApplicationUpdated?: (app: JobApplication) => void) {
     setStatus({ connected: false, lastSyncedAt: null, pendingCount: 0 });
   }, []);
 
+  const clearAll = useCallback(async () => {
+    setError(null);
+    await clearSuggestionsApi();
+    setSuggestions([]);
+    setHistory([]);
+    setStatus((prev) =>
+      prev ? { ...prev, pendingCount: 0 } : prev,
+    );
+  }, []);
+
   const accept = useCallback(
     async (id: string) => {
       setActingId(id);
@@ -257,6 +268,7 @@ export function useGmail(onApplicationUpdated?: (app: JobApplication) => void) {
     setError,
     sync,
     disconnect,
+    clearAll,
     accept,
     dismiss,
     updateHistoryItem,

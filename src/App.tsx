@@ -216,6 +216,7 @@ export default function App() {
         onClose={() => gmail.setQueueOpen(false)}
         onShowHistory={() => gmail.showHistory()}
         onShowPending={() => gmail.showPending()}
+        onClearAll={() => void gmail.clearAll()}
         onAccept={(id) => void gmail.accept(id)}
         onDismiss={(id) => void gmail.dismiss(id)}
         onUpdateHistory={(id, payload) => void gmail.updateHistoryItem(id, payload)}

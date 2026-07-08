@@ -259,6 +259,14 @@ export async function countPendingSuggestions(db: D1Database, email: string) {
   return row?.count ?? 0;
 }
 
+export async function deleteAllSuggestions(db: D1Database, email: string) {
+  const result = await db
+    .prepare("DELETE FROM email_suggestions WHERE user_email = ?")
+    .bind(email)
+    .run();
+  return result.meta.changes ?? 0;
+}
+
 export async function listPendingSuggestions(db: D1Database, email: string) {
   const { results } = await db
     .prepare(

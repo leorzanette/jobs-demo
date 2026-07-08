@@ -13,6 +13,7 @@ interface SuggestionQueueProps {
   onClose: () => void;
   onShowHistory: () => void;
   onShowPending: () => void;
+  onClearAll: () => void;
   onAccept: (id: string) => void;
   onDismiss: (id: string) => void;
   onUpdateHistory: (
@@ -56,6 +57,7 @@ export function SuggestionQueue({
   onClose,
   onShowHistory,
   onShowPending,
+  onClearAll,
   onAccept,
   onDismiss,
   onUpdateHistory,
@@ -63,6 +65,7 @@ export function SuggestionQueue({
   if (!open) return null;
 
   const isHistory = view === "history";
+  const hasAny = suggestions.length > 0 || history.length > 0;
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-slate-900/40">
@@ -295,6 +298,27 @@ export function SuggestionQueue({
             </ul>
           )}
         </div>
+
+        {hasAny && (
+          <div className="border-t border-slate-200 px-4 py-3">
+            <button
+              type="button"
+              disabled={actingId !== null}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "Delete all pending and history suggestions? You can Sync Gmail afterward to recreate matches.",
+                  )
+                ) {
+                  onClearAll();
+                }
+              }}
+              className="w-full rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              Clear all suggestions
+            </button>
+          </div>
+        )}
       </aside>
     </div>
   );
