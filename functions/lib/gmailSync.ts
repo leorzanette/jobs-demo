@@ -1,11 +1,13 @@
 import { decryptSecret, encryptSecret } from "./crypto";
 import {
   getMessagesBatch,
+  hydrateMessageBodies,
   listRecentMessages,
   refreshAccessToken,
   requireGoogleConfig,
   getMessageBody,
   getMessageFrom,
+  getMessageSearchText,
   getMessageSubject,
 } from "./gmail";
 import {
@@ -25,6 +27,8 @@ import {
 
 /** Stay well under Workers Free external subrequest cap (50). */
 const MAX_MESSAGES = 25;
+/** Extra fetches for HTML parts stored as Gmail attachments. */
+const MAX_ATTACHMENT_FETCHES = 15;
 
 async function resolveAccessToken(
   env: Env,
@@ -89,9 +93,10 @@ export async function syncUserInbox(
   }));
 
   const rules = await loadGmailRules(env.DB, connection.user_email);
-  const keywordQuery = gmailKeywordQuery(rules.keywords);
+  const companies = applications.map((app) => app.company);
+  const keywordQuery = gmailKeywordQuery(rules.keywords, companies);
 
-  // External subrequests: ~1 token refresh (optional) + 1 list + 1 batch
+  // External subrequests: ~1 token refresh (optional) + 1 list + 1 batch + attachment hydrates
   const listed = await listRecentMessages(accessToken, {
     maxResults: MAX_MESSAGES,
     newerThanDays: 14,
@@ -103,6 +108,8 @@ export async function syncUserInbox(
     listed.map((item) => item.id),
   );
 
+  await hydrateMessageBodies(accessToken, messages, MAX_ATTACHMENT_FETCHES);
+
   let created = 0;
 
   for (const message of messages) {
@@ -110,14 +117,12 @@ export async function syncUserInbox(
     const subject = getMessageSubject(message);
     const snippet = message.snippet ?? "";
     const body = getMessageBody(message);
-    const searchable = `${from} ${subject} ${snippet} ${body}`;
+    // Match keywords + company against the whole email (headers/snippet/body)
+    const searchable = getMessageSearchText(message);
 
     if (isBlacklisted(searchable, rules.blacklist)) continue;
 
-    const keywordMatch = matchKeyword(
-      `${subject} ${snippet} ${body}`,
-      rules.keywords,
-    );
+    const keywordMatch = matchKeyword(searchable, rules.keywords);
     if (!keywordMatch) continue;
 
     const application = findMatchingApplication(matchable, searchable);

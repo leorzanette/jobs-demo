@@ -95,9 +95,9 @@ export function isBlacklisted(
   text: string,
   blacklist: string[],
 ): string | null {
-  const haystack = text.toLowerCase();
+  const haystack = normalizeMatchText(text);
   for (const term of blacklist) {
-    const needle = term.trim().toLowerCase();
+    const needle = normalizeMatchText(term.trim());
     if (needle.length >= 2 && haystack.includes(needle)) {
       return term.trim();
     }
@@ -105,14 +105,22 @@ export function isBlacklisted(
   return null;
 }
 
+/** Lowercase + strip diacritics so "Educação" matches "educacao". */
+export function normalizeMatchText(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+}
+
 export function matchKeyword(
   text: string,
   rules: KeywordRule[] = DEFAULT_KEYWORD_RULES,
 ): KeywordMatch | null {
-  const haystack = text.toLowerCase();
+  const haystack = normalizeMatchText(text);
   for (const rule of rules) {
     for (const keyword of rule.keywords) {
-      const needle = keyword.trim().toLowerCase();
+      const needle = normalizeMatchText(keyword.trim());
       if (needle.length >= 2 && haystack.includes(needle)) {
         return { status: rule.status, keyword: keyword.trim() };
       }
@@ -121,31 +129,75 @@ export function matchKeyword(
   return null;
 }
 
-/** Gmail `q` fragment that narrows list results before we fetch full messages. */
+function quoteGmailTerm(term: string): string {
+  const escaped = term.trim().replace(/"/g, "");
+  if (!escaped) return "";
+  return escaped.includes(" ") ? `"${escaped}"` : escaped;
+}
+
+/** Gmail `q` fragment: keywords OR tracked company names. */
 export function gmailKeywordQuery(
   rules: KeywordRule[] = DEFAULT_KEYWORD_RULES,
+  companies: string[] = [],
 ): string {
-  const terms = rules.flatMap((rule) =>
-    rule.keywords.map((keyword) => {
-      const escaped = keyword.trim().replace(/"/g, "");
-      if (!escaped) return "";
-      return escaped.includes(" ") ? `"${escaped}"` : escaped;
-    }),
-  ).filter(Boolean);
+  const keywordTerms = rules
+    .flatMap((rule) => rule.keywords.map(quoteGmailTerm))
+    .filter(Boolean);
+
+  const companyTerms = companies
+    .map((company) => quoteGmailTerm(company))
+    .filter((term) => term.length >= 2);
+
+  // Deduplicate while preserving order
+  const seen = new Set<string>();
+  const terms: string[] = [];
+  for (const term of [...keywordTerms, ...companyTerms]) {
+    const key = term.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    terms.push(term);
+  }
 
   if (terms.length === 0) return "";
   return `(${terms.join(" OR ")})`;
+}
+
+function companyAppearsInText(haystack: string, company: string): boolean {
+  const normalizedCompany = normalizeMatchText(company.trim());
+  if (normalizedCompany.length < 2) return false;
+
+  // Exact / substring company name
+  if (haystack.includes(normalizedCompany)) return true;
+
+  // Significant tokens (e.g. "Afya Educação" → "afya")
+  const tokens = normalizedCompany
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 3);
+
+  if (tokens.length === 0) return false;
+
+  // Single meaningful token: accept it
+  if (tokens.length === 1) {
+    return haystack.includes(tokens[0]!);
+  }
+
+  // Multi-word: prefer the longest token (usually the brand)
+  const longest = [...tokens].sort((a, b) => b.length - a.length)[0]!;
+  if (longest.length >= 4 && haystack.includes(longest)) return true;
+
+  // Or require at least two tokens to appear
+  const hits = tokens.filter((token) => haystack.includes(token));
+  return hits.length >= 2;
 }
 
 export function findMatchingApplication(
   applications: MatchableApplication[],
   searchableText: string,
 ): MatchableApplication | null {
-  const haystack = searchableText.toLowerCase();
-  const matches = applications.filter((app) => {
-    const company = app.company.trim().toLowerCase();
-    return company.length >= 2 && haystack.includes(company);
-  });
+  const haystack = normalizeMatchText(searchableText);
+  const matches = applications.filter((app) =>
+    companyAppearsInText(haystack, app.company),
+  );
 
   if (matches.length === 0) return null;
 

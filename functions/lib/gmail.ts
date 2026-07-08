@@ -126,6 +126,7 @@ export interface GmailMessageListItem {
 interface GmailBody {
   data?: string;
   size?: number;
+  attachmentId?: string;
 }
 
 interface GmailPayloadPart {
@@ -186,6 +187,14 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+function isInlineTextPart(part: GmailPayloadPart): boolean {
+  // Skip real file attachments; keep text/html/plain even when filename is set
+  const mime = (part.mimeType ?? "").toLowerCase();
+  if (mime.startsWith("text/")) return true;
+  if (!part.filename || part.filename.length === 0) return true;
+  return false;
+}
+
 function collectParts(
   part: GmailPayloadPart | undefined,
   plain: string[],
@@ -196,7 +205,7 @@ function collectParts(
   const mime = (part.mimeType ?? "").toLowerCase();
   const data = part.body?.data;
 
-  if (data && (!part.filename || part.filename.length === 0)) {
+  if (data && isInlineTextPart(part)) {
     if (mime === "text/plain") {
       plain.push(decodeBase64Url(data));
     } else if (mime === "text/html") {
@@ -212,18 +221,109 @@ function collectParts(
   }
 }
 
-/** Prefer text/plain; fall back to stripped HTML. Caps length for matching. */
-export function getMessageBody(message: GmailMessage, maxChars = 20_000): string {
+interface PendingAttachment {
+  messageId: string;
+  attachmentId: string;
+  part: GmailPayloadPart;
+}
+
+function collectMissingAttachments(
+  message: GmailMessage,
+  part: GmailPayloadPart | undefined,
+  out: PendingAttachment[],
+): void {
+  if (!part) return;
+
+  const mime = (part.mimeType ?? "").toLowerCase();
+  const attachmentId = part.body?.attachmentId;
+  const hasData = Boolean(part.body?.data);
+
+  if (
+    attachmentId &&
+    !hasData &&
+    isInlineTextPart(part) &&
+    (mime.startsWith("text/") || (!mime && !part.parts))
+  ) {
+    out.push({ messageId: message.id, attachmentId, part });
+  }
+
+  for (const child of part.parts ?? []) {
+    collectMissingAttachments(message, child, out);
+  }
+}
+
+async function fetchAttachmentData(
+  accessToken: string,
+  messageId: string,
+  attachmentId: string,
+): Promise<string | null> {
+  const url = `${GMAIL_API}/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) return null;
+  const data = (await response.json()) as { data?: string };
+  return data.data ?? null;
+}
+
+/**
+ * Gmail often returns large text/html parts as attachmentId without inline data.
+ * Resolve a limited number of those so keyword/company matching sees the full email.
+ */
+export async function hydrateMessageBodies(
+  accessToken: string,
+  messages: GmailMessage[],
+  maxFetches = 15,
+): Promise<number> {
+  const pending: PendingAttachment[] = [];
+  for (const message of messages) {
+    collectMissingAttachments(message, message.payload, pending);
+  }
+
+  let fetched = 0;
+  for (const item of pending) {
+    if (fetched >= maxFetches) break;
+    const data = await fetchAttachmentData(
+      accessToken,
+      item.messageId,
+      item.attachmentId,
+    );
+    fetched += 1;
+    if (!data) continue;
+    item.part.body = {
+      ...(item.part.body ?? {}),
+      data,
+      attachmentId: undefined,
+    };
+  }
+  return fetched;
+}
+
+/** Plain + stripped HTML body (both when available). Caps length for matching. */
+export function getMessageBody(message: GmailMessage, maxChars = 50_000): string {
   const plain: string[] = [];
   const html: string[] = [];
   collectParts(message.payload, plain, html);
 
-  let text = plain.join("\n").trim();
-  if (!text && html.length > 0) {
-    text = stripHtml(html.join("\n"));
-  }
+  const chunks: string[] = [];
+  const plainText = plain.join("\n").trim();
+  const htmlText = html.length > 0 ? stripHtml(html.join("\n")) : "";
+  if (plainText) chunks.push(plainText);
+  if (htmlText) chunks.push(htmlText);
+
+  let text = chunks.join("\n").trim();
   if (text.length > maxChars) return text.slice(0, maxChars);
   return text;
+}
+
+/** Full email text for keyword + company matching: headers, snippet, and body. */
+export function getMessageSearchText(message: GmailMessage): string {
+  const headers = (message.payload?.headers ?? [])
+    .map((h) => `${h.name} ${h.value}`)
+    .join("\n");
+  const snippet = message.snippet ?? "";
+  const body = getMessageBody(message);
+  return `${headers}\n${snippet}\n${body}`;
 }
 
 export async function listRecentMessages(
