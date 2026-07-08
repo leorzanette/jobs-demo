@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { ApplicationStatus, JobApplication, JobPlatform } from "../types/application";
 import {
   GUPY_DEFAULT_STAGE_TOTAL,
@@ -22,19 +22,44 @@ interface ApplicationModalProps {
   onDelete?: (id: string) => void | Promise<void>;
 }
 
-const emptyForm = {
-  company: "",
-  role: "",
-  status: "wishlist" as ApplicationStatus,
-  platform: "" as JobPlatform | "",
-  stageCurrent: "",
-  stageTotal: "",
-  appliedDate: "",
-  followUpDate: "",
-  interviewDate: "",
-  jobUrl: "",
-  notes: "",
-};
+function todayLocalDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function buildInitial(application: JobApplication | null) {
+  if (application) {
+    return {
+      company: application.company,
+      role: application.role,
+      status: application.status,
+      platform: application.platform ?? ("" as const),
+      stageCurrent: application.stageCurrent?.toString() ?? "",
+      stageTotal: application.stageTotal?.toString() ?? "",
+      appliedDate: application.appliedDate ?? "",
+      followUpDate: application.followUpDate ?? "",
+      interviewDate: application.interviewDate ?? "",
+      jobUrl: application.jobUrl ?? "",
+      notes: application.notes ?? "",
+    };
+  }
+  return {
+    company: "",
+    role: "",
+    status: "wishlist" as ApplicationStatus,
+    platform: "" as JobPlatform | "",
+    stageCurrent: "",
+    stageTotal: "",
+    appliedDate: todayLocalDate(),
+    followUpDate: "",
+    interviewDate: "",
+    jobUrl: "",
+    notes: "",
+  };
+}
 
 export function ApplicationModal({
   application,
@@ -48,31 +73,10 @@ export function ApplicationModal({
   const platformRef = useRef<HTMLSelectElement>(null);
   const stageTotalRef = useRef<HTMLInputElement>(null);
 
-  const initial = application
-    ? {
-        company: application.company,
-        role: application.role,
-        status: application.status,
-        platform: application.platform ?? ("" as const),
-        stageCurrent: application.stageCurrent?.toString() ?? "",
-        stageTotal: application.stageTotal?.toString() ?? "",
-        appliedDate: application.appliedDate ?? "",
-        followUpDate: application.followUpDate ?? "",
-        interviewDate: application.interviewDate ?? "",
-        jobUrl: application.jobUrl ?? "",
-        notes: application.notes ?? "",
-      }
-    : emptyForm;
-
+  const initial = buildInitial(application);
   const [platform, setPlatform] = useState<JobPlatform | "">(initial.platform);
   const [stageTotal, setStageTotal] = useState(initial.stageTotal);
-
-  useEffect(() => {
-    if (isOpen) {
-      setPlatform(initial.platform);
-      setStageTotal(initial.stageTotal);
-    }
-  }, [isOpen, application?.id]);
+  const [appliedDate, setAppliedDate] = useState(initial.appliedDate);
 
   if (!isOpen) return null;
 
@@ -117,7 +121,7 @@ export function ApplicationModal({
       platform: platformValue as JobPlatform | undefined,
       stageCurrent: stageCurrentRaw ? Number(stageCurrentRaw) : undefined,
       stageTotal: stageTotalRaw ? Number(stageTotalRaw) : undefined,
-      appliedDate: (fd.get("appliedDate") as string) || undefined,
+      appliedDate: appliedDate || undefined,
       followUpDate: (fd.get("followUpDate") as string) || undefined,
       interviewDate: (fd.get("interviewDate") as string) || undefined,
       jobUrl: (fd.get("jobUrl") as string) || undefined,
@@ -134,7 +138,7 @@ export function ApplicationModal({
         {error && (
           <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         )}
-        <form key={application?.id ?? "new"} onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Empresa *</label>
             <input name="company" defaultValue={initial.company} required disabled={saving} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100" />
@@ -227,7 +231,14 @@ export function ApplicationModal({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Candidatura</label>
-              <input name="appliedDate" type="date" defaultValue={initial.appliedDate} disabled={saving} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100" />
+              <input
+                name="appliedDate"
+                type="date"
+                value={appliedDate}
+                onChange={(e) => setAppliedDate(e.target.value)}
+                disabled={saving}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100"
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Follow-up</label>

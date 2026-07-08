@@ -129,15 +129,18 @@ export default function App() {
           <ListView applications={filtered} onSelect={openEdit} />
         )}
       </div>
-      <ApplicationModal
-        application={selected}
-        isOpen={modalOpen}
-        saving={saving}
-        error={actionError}
-        onClose={() => setModalOpen(false)}
-        onSave={handleSave}
-        onDelete={selected ? handleDelete : undefined}
-      />
+      {modalOpen && (
+        <ApplicationModal
+          key={selected?.id ?? "new"}
+          application={selected}
+          isOpen={modalOpen}
+          saving={saving}
+          error={actionError}
+          onClose={() => setModalOpen(false)}
+          onSave={handleSave}
+          onDelete={selected ? handleDelete : undefined}
+        />
+      )}
     </div>
   );
 }

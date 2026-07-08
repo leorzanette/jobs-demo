@@ -45,9 +45,9 @@ export function isUpcoming(dateStr?: string, withinDays = 7): boolean {
 export function formatDate(dateStr?: string): string {
   if (!dateStr) return "—";
   const date = new Date(dateStr + "T00:00:00");
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
     year: "numeric",
   });
 }
