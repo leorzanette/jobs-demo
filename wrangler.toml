@@ -1,14 +1,4 @@
-name = "jobs"
+name = "jobs-demo"
 pages_build_output_dir = "dist"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
-
-[vars]
-ACCESS_TEAM_DOMAIN = "leorzanet.cloudflareaccess.com"
-ACCESS_AUD = "574d5b8b513453db98af8085c787206d10eeefccd5a872ec2b716620b1fa389d"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "job-tracker-d1"
-database_id = "4f9774c8-284c-4153-8ff6-364ac9f246c1"
-migrations_dir = "migrations"
