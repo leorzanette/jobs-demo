@@ -1,0 +1,14 @@
+# Copy to .dev.vars for local Pages Functions development.
+# Never commit .dev.vars.
+
+# Optional: bypass Cloudflare Access during local API testing
+# DEV_BYPASS_EMAIL=you@example.com
+
+# Production API bindings (only needed for build:prod / live API routes)
+# ACCESS_TEAM_DOMAIN=yourteam.cloudflareaccess.com
+# ACCESS_AUD=<cloudflare-access-application-aud>
+# GOOGLE_CLIENT_ID=
+# GOOGLE_CLIENT_SECRET=
+# GMAIL_REDIRECT_URI=https://your-domain.example/api/gmail/oauth/callback
+# TOKEN_ENCRYPTION_KEY=<32-byte-base64-key>
+# CRON_SECRET=<random-secret-for-gmail-cron-worker>

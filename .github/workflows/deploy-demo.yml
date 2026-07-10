@@ -1,7 +1,17 @@
-name: Deploy jobs-demo.leorza.net
+name: Deploy jobs-demo to Cloudflare Pages
 
 on:
   workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - "src/**"
+      - "functions/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.ts"
+      - "wrangler.toml"
+      - ".github/workflows/deploy-demo.yml"
 
 concurrency:
   group: jobs-demo-pages

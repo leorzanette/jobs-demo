@@ -8,7 +8,16 @@
     "build": "tsc -b && vite build --mode demo",
     "preview": "vite preview",
     "dev:prod": "vite",
-    "build:prod": "tsc -b && vite build"
+    "build:prod": "tsc -b && vite build",
+    "deploy": "npm run build && wrangler deploy",
+    "pages:dev": "npm run build && wrangler pages dev dist",
+    "pages:deploy": "npm run build && wrangler pages deploy dist --project-name=jobs-demo",
+    "pages:deploy:prod": "npm run build:prod && wrangler pages deploy dist --project-name=jobs-demo",
+    "d1:migrate": "wrangler d1 migrations apply jobs-demo --remote",
+    "d1:migrate:local": "wrangler d1 migrations apply jobs-demo --local"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "jose": "^5.9.6",
