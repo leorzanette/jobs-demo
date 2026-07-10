@@ -37,25 +37,24 @@ This app is a **Vite + React** static site. The `functions/` directory adds opti
 
 ### Option A — Git integration (recommended)
 
-1. Sign in to the [Cloudflare dashboard](https://dash.cloudflare.com/) → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**.
-2. Select this repository (`leorzanette/jobs-demo`).
-3. Use these build settings:
+1. Sign in to the [Cloudflare dashboard](https://dash.cloudflare.com/) → **Workers & Pages** → your **jobs-demo** project → **Settings** → **Build**.
+2. Use these build settings:
 
-| Setting | Demo (portfolio) | Production (live API) |
-|---------|------------------|------------------------|
-| **Production branch** | `master` | `master` |
-| **Build command** | `npm run build` | `npm run build:prod` |
-| **Build output directory** | `dist` | `dist` |
-| **Root directory** | `/` | `/` |
-| **Node.js version** | `20` (or use `.node-version`) |
+| Setting | Value |
+|---------|-------|
+| **Build command** | `npm run build` |
+| **Build output directory** | `dist` |
+| **Root directory** | *(leave blank)* |
+| **Deploy command** | *(leave blank — do not use `wrangler deploy`)* |
+| **Node.js version** | `20` |
 
-4. Click **Save and Deploy**.
+> **Important:** Cloudflare Pages uploads `dist/` automatically after the build. A custom deploy command is **not** needed for this demo. If you set `npx wrangler deploy`, the build will succeed but deploy will fail with `Missing entry-point to Worker script`. Clear the deploy command field and redeploy.
 
-5. *(Optional)* Add a custom domain under **Custom domains** (e.g. `jobs-demo.leorza.net`).
+3. Click **Save** and trigger a new deployment (**Deployments** → **Retry deployment**).
 
-**Demo deploy** needs no environment variables — the UI uses in-browser mock data.
+4. *(Optional)* Add a custom domain under **Custom domains** (e.g. `jobs-demo.leorza.net`).
 
-**Production deploy** also requires the steps in [Production API setup](#production-api-setup) below.
+**Demo deploy** needs no environment variables — the UI uses in-browser mock data. The `public/_routes.json` file skips `/api/*` Pages Functions so the demo site stays static-only.
 
 ### Option B — Wrangler CLI
 
