@@ -8,7 +8,7 @@ import {
   type SyncQueueEmail,
 } from "./fixtures";
 
-const STORAGE_KEY = "job-tracker-demo";
+const STORAGE_KEY = "job-tracker-demo-v2";
 
 export interface DemoStoreState {
   applications: JobApplication[];
