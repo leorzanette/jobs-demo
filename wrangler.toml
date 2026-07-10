@@ -2,3 +2,15 @@ name = "jobs-demo"
 pages_build_output_dir = "dist"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
+
+# Demo deploys (default `npm run build`) serve mock data in the browser and do
+# not require D1 or secrets. Uncomment the block below for production API routes
+# after creating a database:
+#
+#   npx wrangler d1 create jobs-demo
+#   npx wrangler d1 migrations apply jobs-demo --remote
+#
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "jobs-demo"
+# database_id = "<paste-database-id>"
