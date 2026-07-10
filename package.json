@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "dev:prod": "vite",
     "build:prod": "tsc -b && vite build",
+    "deploy": "npm run build && wrangler deploy",
     "pages:dev": "npm run build && wrangler pages dev dist",
     "pages:deploy": "npm run build && wrangler pages deploy dist --project-name=jobs-demo",
     "pages:deploy:prod": "npm run build:prod && wrangler pages deploy dist --project-name=jobs-demo",

@@ -35,26 +35,27 @@ npm run preview
 
 This app is a **Vite + React** static site. The `functions/` directory adds optional API routes for a full production deployment.
 
-### Option A — Git integration (recommended)
+### Option A — Git integration (Workers Builds)
 
-1. Sign in to the [Cloudflare dashboard](https://dash.cloudflare.com/) → **Workers & Pages** → your **jobs-demo** project → **Settings** → **Build**.
-2. Use these build settings:
+This repo is set up for **Workers Builds** (the dashboard shows separate build + deploy commands).
+
+1. Open [Cloudflare dashboard](https://dash.cloudflare.com/) → **Workers & Pages** → your project → **Settings** → **Build**.
+2. Use these settings:
 
 | Setting | Value |
 |---------|-------|
 | **Build command** | `npm run build` |
-| **Build output directory** | `dist` |
-| **Root directory** | *(leave blank)* |
-| **Deploy command** | *(leave blank — do not use `wrangler deploy`)* |
-| **Node.js version** | `20` |
+| **Deploy command** | `npx wrangler deploy` |
+| **Non-production branch deploy command** | *(leave blank)* |
+| **Path** | `/` |
 
-> **Important:** Cloudflare Pages uploads `dist/` automatically after the build. A custom deploy command is **not** needed for this demo. If you set `npx wrangler deploy`, the build will succeed but deploy will fail with `Missing entry-point to Worker script`. Clear the deploy command field and redeploy.
+> Do **not** use `wrangler pages deploy` here — that command is for classic Pages projects and may fail to save in this UI. `wrangler deploy` works because `wrangler.toml` points at `./dist` via `[assets]`.
 
-3. Click **Save** and trigger a new deployment (**Deployments** → **Retry deployment**).
+3. Save and **Retry deployment**.
 
-4. *(Optional)* Add a custom domain under **Custom domains** (e.g. `jobs-demo.leorza.net`).
+4. *(Optional)* Add a custom domain under **Domains**.
 
-**Demo deploy** needs no environment variables — the UI uses in-browser mock data. The `public/_routes.json` file skips `/api/*` Pages Functions so the demo site stays static-only.
+**Demo deploy** needs no environment variables — the UI uses in-browser mock data.
 
 ### Option B — Wrangler CLI
 
